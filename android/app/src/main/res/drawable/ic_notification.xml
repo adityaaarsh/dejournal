@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon: must be a single colour (white) with transparency. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:pathData="M20,16h12c9.4,0 16,6.6 16,16s-6.6,16 -16,16H20z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M32,27a5,5 0,1 1,0 10a5,5 0,1 1,0 -10z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup rules. Journal data (WebView storage) is included in the
+  user's own encrypted Google backup and device-to-device transfer, so a new
+  phone can restore it. Nothing is sent anywhere else.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="root" path="app_webview/" />
+        <include domain="sharedpref" path="." />
+        <exclude domain="root" path="app_webview/Default/Cache/" />
+        <exclude domain="root" path="app_webview/Default/Code Cache/" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="root" path="app_webview/" />
+        <include domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

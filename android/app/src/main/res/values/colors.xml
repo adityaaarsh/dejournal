@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dj_bg_dark">#0F1012</color>
+    <color name="dj_bg_light">#F6F6F4</color>
+    <color name="dj_accent">#5B9BFF</color>
+    <color name="dj_icon_bg">#16171A</color>
+</resources>

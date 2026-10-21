@@ -1,0 +1,19 @@
+node_modules
+dist
+*.local
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+
+# Signing keys and local machine config — never commit
+*.jks
+*.keystore
+keystore.properties
+local.properties
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

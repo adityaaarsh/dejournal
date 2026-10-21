@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older backup rules (see data_extraction_rules.xml). -->
+<full-backup-content>
+    <include domain="root" path="app_webview/" />
+    <include domain="sharedpref" path="." />
+    <exclude domain="root" path="app_webview/Default/Cache/" />
+</full-backup-content>
