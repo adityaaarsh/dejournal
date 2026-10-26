@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowDown, ArrowUp, Pencil, Plus, Repeat, Trash } from 'lucide-react'
-import { Button, Card, EmptyState, Field, IconButton, Input, LoadingState, Page, PageHeader, ProgressBar, Sheet, Toggle } from '@/components/ui'
+import { Button, Card, EmptyState, Field, IconButton, IconTile, Input, LoadingState, NavSquare, Page, PageHeader, RECORD_TONE, Sheet, Toggle } from '@/components/ui'
 import { db } from '@/db/db'
-import type { Routine } from '@/db/types'
+import type { Routine, RoutineLog } from '@/db/types'
 import { createRoutine, deleteRoutine, moveRoutine, routineCompletion, updateRoutine } from '@/db/routines'
 import { WeekdayPicker } from '@/features/tasks/WeekdayPicker'
-import { addDays, today } from '@/lib/dates'
+import { addDays, dateRange, formatDate, today, weekday } from '@/lib/dates'
+import { cn } from '@/lib/text'
 import { describeRecurrence } from '@/lib/recurrence'
 import { useSettings } from '@/stores/settings'
 import { toast } from '@/stores/ui'
@@ -76,6 +77,27 @@ function RoutineSheet({ routine, onClose }: { routine?: Routine; onClose: () => 
   )
 }
 
+/** Last 30 days as small rounded squares: done, missed, or not scheduled. */
+function ConsistencyStrip({ routine, logs, end }: { routine: Routine; logs: RoutineLog[]; end: string }) {
+  const done = new Set(logs.filter((l) => l.routineId === routine.id).map((l) => l.date))
+  const days = dateRange(addDays(end, -29), end)
+  const scheduled = (d: string) => routine.days.length === 0 || routine.days.includes(weekday(d))
+  return (
+    <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-1" role="img" aria-label={`${routine.name}: done on ${days.filter((d) => done.has(d)).length} of the last 30 days`}>
+      {days.map((d) => (
+        <span
+          key={d}
+          title={formatDate(d, 'EEE d MMM')}
+          className={cn(
+            "block aspect-square rounded-[5px]",
+            done.has(d) ? 'bg-success' : scheduled(d) ? 'bg-surface-3' : 'border border-line bg-transparent',
+          )}
+        />
+      ))}
+    </div>
+  )
+}
+
 /** Manage tracked routines and see recent consistency. */
 export default function RoutinesPage() {
   const routines = useLiveQuery(async () => (await db.routines.toArray()).sort((a, b) => a.order - b.order), [])
@@ -89,7 +111,7 @@ export default function RoutinesPage() {
         title="Routines"
         back="/more"
         subtitle="Small habits you choose to track"
-        actions={<IconButton icon={Plus} label="New routine" variant="primary" size="sm" onClick={() => setEditing('new')} />}
+        actions={<NavSquare icon={Plus} label="New routine" onClick={() => setEditing('new')} />}
       />
       {routines === undefined ? (
         <LoadingState />
@@ -105,32 +127,35 @@ export default function RoutinesPage() {
           }
         />
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-2">
           {routines.map((r, i) => {
             const c = routineCompletion(r, logs ?? [], t, 30)
             return (
               <li key={r.id}>
-                <Card className="p-4">
-                  <div className="flex items-start gap-2">
+                <Card className={cn('px-3 pt-2.5 pb-1', !r.active && 'opacity-70')}>
+                  <div className="flex items-center gap-3">
+                    <IconTile icon={Repeat} tone={r.active ? RECORD_TONE.routine : 'muted'} />
                     <div className="min-w-0 flex-1">
-                      <h2 className="truncate text-[15px] font-medium">{r.name}</h2>
-                      <p className="text-xs text-faint">{daysLabel(r.days)}</p>
+                      <h2 className="truncate text-[14px] font-semibold">{r.name}</h2>
+                      <p className="truncate text-xs text-muted">
+                        {daysLabel(r.days)} · {c.applicable ? `${c.done}/${c.applicable} days` : "no days yet"}
+                      </p>
                     </div>
-                    <div className="-mt-1 -mr-2 flex shrink-0 items-center">
+                    <div className="-mr-1.5 flex shrink-0 items-center">
                       <IconButton icon={ArrowUp} label={`Move ${r.name} up`} size="sm" disabled={i === 0} onClick={() => moveRoutine(r.id, -1)} />
                       <IconButton icon={ArrowDown} label={`Move ${r.name} down`} size="sm" disabled={i === routines.length - 1} onClick={() => moveRoutine(r.id, 1)} />
                       <IconButton icon={Pencil} label={`Edit ${r.name}`} size="sm" onClick={() => setEditing(r)} />
                       <IconButton icon={Trash} label={`Delete ${r.name}`} size="sm" variant="danger" onClick={() => deleteRoutine(r.id)} />
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <div className="mb-1.5 flex justify-between text-xs text-muted">
+                  <div className="mt-2.5">
+                    <div className="mb-1.5 flex justify-between text-[11px] text-faint">
                       <span>Last 30 days</span>
-                      <span className="tabular-nums">{c.applicable ? `${c.done} of ${c.applicable} days` : 'No days yet'}</span>
+                      <span>Today</span>
                     </div>
-                    <ProgressBar value={c.done} max={c.applicable} label={`${r.name} completion over the last 30 days`} tone="success" />
+                    <ConsistencyStrip routine={r} logs={logs ?? []} end={t} />
                   </div>
-                  <div className="mt-2 border-t border-line pt-1">
+                  <div className="mt-2 border-t border-line">
                     <Toggle
                       checked={r.active}
                       onChange={(v) => updateRoutine(r.id, { active: v })}

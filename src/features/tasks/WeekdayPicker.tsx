@@ -29,8 +29,8 @@ export function WeekdayPicker({
             aria-label={FULL[d]}
             onClick={() => onChange(on ? value.filter((x) => x !== d) : [...value, d].sort())}
             className={cn(
-              'grid h-10 w-10 place-items-center rounded-full border text-[13px] font-medium transition-colors',
-              on ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface-2 text-muted hover:text-text',
+              'grid h-10 flex-1 place-items-center rounded-xl border text-[13px] font-bold transition-colors',
+              on ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-muted hover:text-text',
             )}
           >
             {labels[i]}

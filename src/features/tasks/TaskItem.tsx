@@ -1,17 +1,11 @@
 import type { ReactNode } from 'react'
-import { Check, Clock, Repeat } from 'lucide-react'
+import { Check, Clock, Flag, Repeat } from 'lucide-react'
 import type { Task } from '@/db/types'
 import { toggleTask } from '@/db/tasks'
 import { formatTime } from '@/lib/dates'
 import { cn } from '@/lib/text'
 
-const PRIORITY_DOT: Record<Task['priority'], string | null> = {
-  high: 'bg-danger',
-  normal: null,
-  low: 'bg-faint',
-}
-
-/** Round-cornered checkbox used for tasks. */
+/** Round checkbox used for tasks (matches the Today to-do card). */
 export function TaskCheckbox({ task, size = 'md' }: { task: Task; size?: 'sm' | 'md' }) {
   return (
     <button
@@ -27,9 +21,9 @@ export function TaskCheckbox({ task, size = 'md' }: { task: Task; size?: 'sm' | 
     >
       <span
         className={cn(
-          'grid place-items-center rounded-[6px] border-[1.5px] transition-colors',
-          size === 'md' ? 'h-[19px] w-[19px]' : 'h-4 w-4',
-          task.completed ? 'border-accent bg-accent text-on-accent' : 'border-line-strong hover:border-muted',
+          'grid place-items-center rounded-full border-[1.5px] transition-colors',
+          size === 'md' ? 'h-5 w-5' : 'h-4 w-4',
+          task.completed ? 'border-accent bg-accent text-on-accent' : 'border-faint hover:border-accent',
         )}
       >
         {task.completed && <Check size={size === 'md' ? 13 : 11} strokeWidth={3} aria-hidden />}
@@ -57,28 +51,30 @@ export function TaskItem({
   actions?: ReactNode
   overdue?: boolean
 }) {
-  const dot = PRIORITY_DOT[task.priority]
-  const hasMeta = task.dueTime || task.seriesId || task.category || meta || overdue
+  const hasMeta = task.dueTime || task.seriesId || task.category || meta || overdue || task.priority !== 'normal'
   return (
-    <div className="group flex min-h-11 items-center gap-3 py-1.5">
+    <div className="group flex min-h-[52px] items-center gap-3 py-1.5">
       <TaskCheckbox task={task} />
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 py-1 text-left">
         <span className="flex items-center gap-2">
           <span
             className={cn(
-              'truncate text-[15px] leading-snug transition-colors',
-              task.completed ? 'text-faint line-through decoration-faint' : 'text-text',
+              'truncate text-[14px] leading-snug font-semibold transition-colors',
+              task.completed ? 'font-normal text-faint line-through decoration-faint' : 'text-text',
             )}
           >
             {task.title}
           </span>
-          {dot && !task.completed && (
-            <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dot)} aria-label={`${task.priority} priority`} role="img" />
-          )}
         </span>
         {hasMeta && (
-          <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-faint">
-            {overdue && <span className="text-warn">Overdue</span>}
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted">
+            {overdue && <span className="font-semibold text-warn">Overdue</span>}
+            {task.priority === 'high' && !task.completed && (
+              <span className="inline-flex items-center gap-1 font-semibold text-danger">
+                <Flag size={11} strokeWidth={2.5} aria-hidden /> High
+              </span>
+            )}
+            {task.priority === 'low' && !task.completed && <span>Low priority</span>}
             {meta}
             {task.dueTime && (
               <span className="inline-flex items-center gap-1">

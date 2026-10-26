@@ -9,7 +9,6 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  CircleCheck,
   Clock,
   Image,
   List,
@@ -40,8 +39,25 @@ import {
   type SearchResult,
   type SearchType,
 } from '@/domain/search'
-import { Button, Chip, EmptyState, Field, IconButton, Input, LoadingState, Page, PageHeader, Segmented, TagInput } from '@/components/ui'
+import {
+  Button,
+  CenteredHeader,
+  Chip,
+  EmptyState,
+  Field,
+  IconButton,
+  IconTile,
+  Input,
+  LoadingState,
+  NavSquare,
+  Page,
+  RECORD_TONE,
+  Segmented,
+  TagInput,
+  type Tone,
+} from '@/components/ui'
 import { kvGet, kvSet } from '@/db/repo'
+import { MatchGrid } from '@/features/search/MatchGrid'
 import { useSettings } from '@/stores/settings'
 import { openDialog } from '@/stores/ui'
 import {
@@ -50,11 +66,9 @@ import {
   formatDate,
   formatMonth,
   isISODate,
-  monthGrid,
   monthKey,
   relativeDayLabel,
   today,
-  weekdayLabels,
 } from '@/lib/dates'
 import { formatMoney } from '@/lib/money'
 import { cn, plural, snippet } from '@/lib/text'
@@ -72,6 +86,21 @@ const TYPE_ICONS: Record<SearchType, LucideIcon> = {
   place: MapPin,
   reflection: BookHeart,
   monthly: BookHeart,
+}
+
+/** Icon-tile colour per result type (same tones as the rest of the app). */
+const TYPE_TONE: Record<SearchType, Tone> = {
+  task: RECORD_TONE.task,
+  reminder: RECORD_TONE.reminder,
+  event: RECORD_TONE.event,
+  note: RECORD_TONE.note,
+  highlight: RECORD_TONE.highlight,
+  photo: RECORD_TONE.photo,
+  expense: RECORD_TONE.expense,
+  study: RECORD_TONE.study,
+  place: RECORD_TONE.place,
+  reflection: RECORD_TONE.reflection,
+  monthly: RECORD_TONE.reflection,
 }
 
 const RECENT_KEY = 'recentSearches'
@@ -176,52 +205,36 @@ function ResultItem({ r, query, onOpen, dateFormat }: { r: SearchResult; query: 
   const e = r.entry
   const Icon = TYPE_ICONS[e.type]
   const snip = e.text ? snippet(e.text, query, 56) : ''
+  const done = e.status === 'done'
   return (
-    <li className="flex items-stretch">
+    <li className="flex items-center gap-1 border-t border-line first:border-t-0">
       <button
         type="button"
         onClick={() => onOpen(e)}
-        className="flex min-h-14 min-w-0 flex-1 items-start gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+        className="flex min-h-[56px] min-w-0 flex-1 items-center gap-3 rounded-xl py-2 text-left transition-colors hover:bg-surface-2/60"
+        aria-label={`${SEARCH_TYPE_LABELS[e.type].one}: ${e.title}${e.date ? `, ${relativeDayLabel(e.date, dateFormat)}` : ''}`}
       >
-        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-muted">
-          <Icon size={16} strokeWidth={1.8} aria-hidden />
-        </span>
+        <span className="w-12 shrink-0 text-xs font-semibold text-muted tabular-nums">{e.date ? formatDate(e.date, 'd MMM') : '—'}</span>
+        <IconTile icon={Icon} tone={done ? 'muted' : TYPE_TONE[e.type]} />
         <span className="min-w-0 flex-1">
-          <span className={cn('block truncate text-[15px]', e.status === 'done' && 'text-muted line-through decoration-faint')}>
+          <span className={cn('block truncate text-[14px] font-semibold', done && 'text-faint line-through decoration-faint')}>
             <Highlighted text={e.title} query={query} />
           </span>
-          {snip && (
-            <span className="mt-0.5 line-clamp-2 block text-[13px] text-muted">
+          <span className="block truncate text-xs text-muted">
+            {snip ? (
               <Highlighted text={snip} query={query} />
-            </span>
-          )}
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-faint">
-            <span>{SEARCH_TYPE_LABELS[e.type].one}</span>
-            {e.date && (
+            ) : (
               <>
-                <span aria-hidden>·</span>
-                <span>{relativeDayLabel(e.date, dateFormat)}</span>
+                {SEARCH_TYPE_LABELS[e.type].one}
+                {done && ' · done'}
+                {e.tags.slice(0, 3).map((t) => ` #${t}`)}
               </>
             )}
-            {e.status === 'done' && (
-              <span className="inline-flex items-center gap-0.5 text-success">
-                <CircleCheck size={12} aria-hidden /> Done
-              </span>
-            )}
-            {e.tags.slice(0, 3).map((t) => (
-              <span key={t}>#{t}</span>
-            ))}
           </span>
         </span>
       </button>
       {e.date && (
-        <IconButton
-          icon={ArrowUpRight}
-          size="sm"
-          label={`Open ${formatDate(e.date, 'd MMM yyyy')}`}
-          className="mt-2 self-start"
-          onClick={() => navigate(`/?d=${e.date}`)}
-        />
+        <IconButton icon={ArrowUpRight} size="sm" label={`Open ${formatDate(e.date, 'd MMM yyyy')}`} onClick={() => navigate(`/?d=${e.date}`)} />
       )}
     </li>
   )
@@ -229,10 +242,10 @@ function ResultItem({ r, query, onOpen, dateFormat }: { r: SearchResult; query: 
 
 function Group({ title, count, children, more }: { title: string; count: number; children: ReactNode; more?: ReactNode }) {
   return (
-    <section className="rounded-[var(--radius-card)] border border-line bg-surface p-2">
-      <h2 className="flex items-center justify-between px-2 pt-1.5 pb-1 text-[13px] font-medium text-muted">
+    <section className="rounded-[var(--radius-card)] border border-line bg-surface px-3 pt-2.5 pb-1.5">
+      <h2 className="flex items-center justify-between pb-1 text-[14px] font-semibold">
         {title}
-        <span className="tabular-nums text-faint">{count}</span>
+        <span className="text-xs font-semibold text-muted tabular-nums">{count}</span>
       </h2>
       <ul>{children}</ul>
       {more}
@@ -266,7 +279,7 @@ function ListResults({ results, query, onOpen, sort, dateFormat }: { results: Se
               rs.length > PAGE_GROUP && (
                 <button
                   type="button"
-                  className="mt-1 h-10 w-full rounded-xl text-[13px] font-medium text-accent hover:bg-surface-2"
+                  className="h-10 w-full rounded-xl border-t border-line text-[13px] font-semibold text-accent hover:bg-surface-2/60"
                   onClick={() =>
                     setExpanded((s) => {
                       const n = new Set(s)
@@ -308,70 +321,43 @@ function CalendarResults({ results, query, onOpen, dateFormat }: { results: Sear
     setSelected(null)
   }, [latest])
 
-  const grid = monthGrid(month, settings.weekStartsOn)
+  const counts = new Map<string, number>()
+  for (const [d, rs] of byDate) if (d.startsWith(month)) counts.set(d, rs.length)
   const monthCount = Array.from(byDate.entries()).filter(([d]) => d.startsWith(month)).reduce((s, [, v]) => s + v.length, 0)
   const undated = results.filter((r) => !r.entry.date).length
   const selectedResults = selected ? byDate.get(selected) ?? [] : []
 
   return (
     <div className="flex flex-col gap-3">
-      <section className="rounded-[var(--radius-card)] border border-line bg-surface p-3 sm:p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <IconButton icon={ChevronLeft} label="Previous month" size="sm" onClick={() => setMonth((m) => addMonthsKey(m, -1))} />
-          <div className="text-center">
-            <h2 className="text-[15px] font-medium">{formatMonth(month)}</h2>
-            <p className="text-xs text-muted">{monthCount ? `${plural(monthCount, 'match', 'matches')} this month` : 'No matches this month'}</p>
-          </div>
-          <IconButton icon={ChevronRight} label="Next month" size="sm" onClick={() => setMonth((m) => addMonthsKey(m, 1))} />
+      <div className="flex items-center gap-3">
+        <NavSquare icon={ChevronLeft} label="Previous month" onClick={() => setMonth((m) => addMonthsKey(m, -1))} />
+        <div className="min-w-0 flex-1 text-center">
+          <h2 className="font-display text-[16px] font-semibold tracking-tight">{formatMonth(month)}</h2>
+          <p className="text-xs text-muted">{monthCount ? `${plural(monthCount, 'match', 'matches')} this month` : 'No matches this month'}</p>
         </div>
-        <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-faint" aria-hidden>
-          {weekdayLabels(settings.weekStartsOn, 'narrow').map((w, i) => (
-            <div key={i} className="py-1">
-              {w}
-            </div>
-          ))}
-        </div>
-        <div role="grid" aria-label={`Matches in ${formatMonth(month)}`} className="grid grid-cols-7 gap-1">
-          {grid.map((d) => {
-            const inMonth = d.startsWith(month)
-            const n = byDate.get(d)?.length ?? 0
-            const isSel = selected === d
-            const isToday = d === today()
-            return (
-              <button
-                key={d}
-                type="button"
-                role="gridcell"
-                disabled={!n}
-                aria-selected={isSel}
-                aria-label={`${formatDate(d, 'EEEE d MMMM')}: ${n ? plural(n, 'match', 'matches') : 'no matches'}`}
-                onClick={() => setSelected(isSel ? null : d)}
-                className={cn(
-                  'relative flex aspect-square min-h-10 flex-col items-center justify-center rounded-xl text-[13px] tabular-nums transition-colors',
-                  !inMonth && 'opacity-35',
-                  n ? 'bg-accent-soft font-medium text-text hover:brightness-125' : 'text-faint',
-                  isSel && 'bg-accent text-on-accent hover:brightness-100',
-                  isToday && !isSel && 'ring-1 ring-line-strong',
-                )}
-              >
-                {Number(d.slice(8))}
-                {n > 0 && (
-                  <span className={cn('absolute bottom-1 text-[9px] leading-none', isSel ? 'text-on-accent' : 'text-accent')}>{n > 9 ? '9+' : n}</span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </section>
+        <NavSquare icon={ChevronRight} label="Next month" onClick={() => setMonth((m) => addMonthsKey(m, 1))} />
+      </div>
+      <MatchGrid
+        month={month}
+        weekStartsOn={settings.weekStartsOn}
+        today={today()}
+        selected={selected}
+        counts={counts}
+        onSelect={(d) => setSelected(selected === d ? null : d)}
+      />
       {selected ? (
-        <Group title={formatDate(selected, 'EEEE, d MMMM yyyy')} count={selectedResults.length}>
-          {selectedResults.map((r) => (
-            <ResultItem key={`${r.entry.type}:${r.entry.id}`} r={r} query={query} onOpen={onOpen} dateFormat={dateFormat} />
-          ))}
-        </Group>
+        selectedResults.length ? (
+          <Group title={formatDate(selected, 'EEEE d')} count={selectedResults.length}>
+            {selectedResults.map((r) => (
+              <ResultItem key={`${r.entry.type}:${r.entry.id}`} r={r} query={query} onOpen={onOpen} dateFormat={dateFormat} />
+            ))}
+          </Group>
+        ) : (
+          <p className="px-1 text-center text-[13px] text-muted">No matches on {formatDate(selected, 'd MMMM')}.</p>
+        )
       ) : (
         <p className="px-1 text-center text-[13px] text-muted">
-          {byDate.size ? 'Select a highlighted date to see its matches.' : 'None of the matches have a date.'}
+          {byDate.size ? 'Highlighted days have matches. Select one to see them.' : 'None of the matches have a date.'}
           {undated > 0 && ` ${plural(undated, 'match')} without a date ${undated === 1 ? 'is' : 'are'} shown in List mode.`}
         </p>
       )}
@@ -455,87 +441,84 @@ export default function SearchPage() {
 
   return (
     <Page>
-      <PageHeader title="Search">
-        <form
-          role="search"
-          className="mt-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            update({ q: draft.trim() || null })
-            void saveRecent(draft)
-            inputRef.current?.blur()
-          }}
-        >
-          <div className="relative">
-            <SearchIcon size={18} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" aria-hidden />
-            <input
-              ref={inputRef}
-              type="search"
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && draft) {
-                  e.preventDefault()
-                  setDraft('')
-                  update({ q: null })
-                }
-              }}
-              placeholder="Search tasks, notes, memories…"
-              aria-label="Search all records"
-              className="h-12 w-full rounded-2xl border border-line bg-surface pr-12 pl-10 text-base placeholder:text-faint focus:border-accent focus:outline-none focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
-            />
-            {draft && (
-              <IconButton
-                icon={X}
-                size="sm"
-                label="Clear search"
-                className="absolute top-1/2 right-1.5 -translate-y-1/2"
-                onClick={() => {
-                  setDraft('')
-                  update({ q: null })
-                  inputRef.current?.focus()
-                }}
-              />
-            )}
-          </div>
-        </form>
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <Segmented
-            label="Result view"
-            size="sm"
-            value={mode}
-            onChange={(m) => update({ mode: m === 'list' ? null : m })}
-            options={[
-              { value: 'list', label: 'List', icon: <List size={14} aria-hidden /> },
-              { value: 'calendar', label: 'Calendar', icon: <CalendarDays size={14} aria-hidden /> },
-            ]}
-          />
-          <Button
-            size="sm"
-            variant={filterCount ? 'subtle' : 'ghost'}
+      <CenteredHeader
+        title="Search"
+        subtitle={data ? `${plural(entries.length, 'record')} in your journal` : 'Loading…'}
+        right={
+          <NavSquare
             icon={SlidersHorizontal}
-            aria-expanded={showFilters}
-            aria-controls="search-filters"
+            label={showFilters ? 'Hide filters' : `Filters${filterCount ? ` (${filterCount} active)` : ''}`}
+            active={showFilters || filterCount > 0}
             onClick={() => setShowFilters((s) => !s)}
-          >
-            Filters{filterCount ? ` · ${filterCount}` : ''}
-          </Button>
+          />
+        }
+      />
+      <form
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault()
+          update({ q: draft.trim() || null })
+          void saveRecent(draft)
+          inputRef.current?.blur()
+        }}
+      >
+        <div className="relative">
+          <SearchIcon size={18} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-muted" aria-hidden />
+          <input
+            ref={inputRef}
+            type="search"
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && draft) {
+                e.preventDefault()
+                setDraft('')
+                update({ q: null })
+              }
+            }}
+            placeholder="Search tasks, notes, memories…"
+            aria-label="Search all records"
+            className="h-[52px] w-full rounded-[18px] border border-line bg-surface pr-12 pl-11 text-[15px] placeholder:text-faint focus:border-accent focus:outline-none focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
+          />
+          {draft && (
+            <IconButton
+              icon={X}
+              size="sm"
+              label="Clear search"
+              className="absolute top-1/2 right-2 -translate-y-1/2"
+              onClick={() => {
+                setDraft('')
+                update({ q: null })
+                inputRef.current?.focus()
+              }}
+            />
+          )}
         </div>
-      </PageHeader>
+      </form>
+      <Segmented
+        label="Result view"
+        className="mt-3 w-full"
+        value={mode}
+        onChange={(m) => update({ mode: m === 'list' ? null : m })}
+        options={[
+          { value: 'list', label: 'List', icon: <List size={14} aria-hidden /> },
+          { value: 'calendar', label: 'Calendar', icon: <CalendarDays size={14} aria-hidden /> },
+        ]}
+      />
+      <div className="scrollbar-none -mx-4 mt-3 mb-3 flex gap-1.5 overflow-x-auto px-4 sm:-mx-6 sm:px-6" role="group" aria-label="Record types">
+        {SEARCH_TYPES.filter((t) => t !== 'monthly').map((t) => {
+          const Icon = TYPE_ICONS[t]
+          return (
+            <Chip key={t} active={types.includes(t)} onClick={() => toggleType(t)} className="h-8 shrink-0 px-3">
+              <Icon size={13} aria-hidden /> {SEARCH_TYPE_LABELS[t].many}
+            </Chip>
+          )
+        })}
+      </div>
 
       {showFilters && (
-        <section id="search-filters" aria-label="Search filters" className="dj-fade-in mb-4 flex flex-col gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-4">
-          <div>
-            <p className="mb-2 text-[13px] font-medium text-muted">Record types</p>
-            <div className="flex flex-wrap gap-1.5">
-              {SEARCH_TYPES.map((t) => (
-                <Chip key={t} active={types.includes(t)} onClick={() => toggleType(t)}>
-                  {SEARCH_TYPE_LABELS[t].many}
-                </Chip>
-              ))}
-            </div>
-          </div>
+        <section id="search-filters" aria-label="Search filters" className="dj-fade-in mb-3 flex flex-col gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="From">{(p) => <Input type="date" {...p} value={from} max={to || undefined} onChange={(e) => update({ from: e.target.value || null })} />}</Field>
             <Field label="To">{(p) => <Input type="date" {...p} value={to} min={from || undefined} onChange={(e) => update({ to: e.target.value || null })} />}</Field>
@@ -570,47 +553,33 @@ export default function SearchPage() {
           {settings.recentSearchesEnabled && recent && recent.length > 0 && (
             <section aria-labelledby="recent-h">
               <div className="mb-2 flex items-center justify-between px-1">
-                <h2 id="recent-h" className="text-[13px] font-medium text-muted">
+                <h2 id="recent-h" className="text-[13px] font-semibold text-muted">
                   Recent searches
                 </h2>
                 <button type="button" className="text-[13px] text-accent hover:underline" onClick={() => kvSet(RECENT_KEY, [])}>
                   Clear
                 </button>
               </div>
-              <ul className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-                {recent.map((t, i) => (
-                  <li key={t} className={i ? 'border-t border-line' : undefined}>
+              <ul className="rounded-[var(--radius-card)] border border-line bg-surface px-3 py-1">
+                {recent.map((t) => (
+                  <li key={t} className="border-t border-line first:border-t-0">
                     <button
                       type="button"
                       onClick={() => {
                         setDraft(t)
                         update({ q: t })
                       }}
-                      className="flex h-12 w-full items-center gap-3 px-4 text-left text-[15px] hover:bg-surface-2"
+                      className="flex min-h-[52px] w-full items-center gap-3 text-left"
                     >
-                      <Clock size={16} className="text-faint" aria-hidden />
-                      <span className="truncate">{t}</span>
+                      <IconTile icon={Clock} tone="muted" />
+                      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{t}</span>
+                      <ArrowUpRight size={15} className="text-faint" aria-hidden />
                     </button>
                   </li>
                 ))}
               </ul>
             </section>
           )}
-          <section aria-labelledby="browse-h">
-            <h2 id="browse-h" className="mb-2 px-1 text-[13px] font-medium text-muted">
-              Browse by type
-            </h2>
-            <div className="flex flex-wrap gap-1.5">
-              {SEARCH_TYPES.map((t) => {
-                const Icon = TYPE_ICONS[t]
-                return (
-                  <Chip key={t} onClick={() => update({ types: t })}>
-                    <Icon size={13} aria-hidden /> {SEARCH_TYPE_LABELS[t].many}
-                  </Chip>
-                )
-              })}
-            </div>
-          </section>
           <EmptyState
             compact
             icon={SearchIcon}

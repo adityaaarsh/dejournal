@@ -1,14 +1,28 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowDown, ArrowUp, CalendarClock, ListChecks, Plus, Search, X } from 'lucide-react'
-import { Button, IconButton, Input, Page, PageHeader, Segmented, Select, EmptyState, LoadingState } from '@/components/ui'
+import { AlarmClock, ArrowDown, ArrowUp, CalendarClock, CircleCheck, ListChecks, Plus, Search, SlidersHorizontal, X } from 'lucide-react'
+import {
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  IconButton,
+  Input,
+  LoadingState,
+  MetricTile,
+  NavSquare,
+  Page,
+  PageHeader,
+  Segmented,
+  Select,
+} from '@/components/ui'
 import { db } from '@/db/db'
 import type { ISODate, Priority, Task } from '@/db/types'
 import { moveTask, reorderTasks, sortTasks } from '@/db/tasks'
 import { TaskItem } from '@/features/tasks/TaskItem'
 import { taskStats } from '@/domain/taskStats'
-import { addDays, isISODate, monthEnd, monthKey, relativeDayLabel, today, weekRange } from '@/lib/dates'
+import { addDays, formatDate, isISODate, monthEnd, monthKey, relativeDayLabel, today, weekRange } from '@/lib/dates'
 import { matchesQuery, plural } from '@/lib/text'
 import { useSettings } from '@/stores/settings'
 import { openDialog, toast } from '@/stores/ui'
@@ -23,6 +37,8 @@ const VIEWS: Array<{ value: View; label: string }> = [
   { value: 'all', label: 'All' },
 ]
 
+const RANGE_LABEL: Record<Range, string> = { any: 'Any date', today: 'Today', next7: 'Next 7 days', week: 'This week', month: 'This month' }
+
 function MoveRow({ task, onDone }: { task: Task; onDone: () => void }) {
   const t = today()
   const go = async (d: ISODate) => {
@@ -31,7 +47,7 @@ function MoveRow({ task, onDone }: { task: Task; onDone: () => void }) {
     onDone()
   }
   return (
-    <div className="mb-2 ml-8 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 p-2">
+    <div className="mb-2 ml-8 flex flex-wrap items-center gap-2 rounded-2xl bg-surface-2 p-2">
       <span className="px-1 text-xs text-muted">Move to</span>
       {task.date !== t && (
         <Button size="sm" onClick={() => go(t)}>
@@ -68,6 +84,7 @@ export default function TasksPage() {
   const [category, setCategory] = useState('any')
   const [range, setRange] = useState<Range>('any')
   const [movingId, setMovingId] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
   const [limit, setLimit] = useState(80)
 
   const all = useLiveQuery(() => db.tasks.toArray(), [])
@@ -142,57 +159,99 @@ export default function TasksPage() {
   }
 
   const filtersActive = priority !== 'any' || category !== 'any' || range !== 'any' || query.trim() !== ''
+  const selectFilters = priority !== 'any' || category !== 'any' || range !== 'any'
+  const clearFilters = () => {
+    setPriority('any')
+    setCategory('any')
+    setRange('any')
+    setQuery('')
+  }
 
   return (
     <Page>
       <PageHeader
         title="Tasks"
         back="/more"
-        subtitle={
-          todayStats.total === 0
-            ? 'No tasks scheduled today'
-            : `Today: ${todayStats.done} of ${todayStats.total} done · ${todayStats.percent}%${overdueCount ? ` · ${overdueCount} overdue` : ''}`
-        }
-        actions={<IconButton icon={Plus} label="New task" variant="primary" size="sm" onClick={() => openDialog({ kind: 'task', date: t })} />}
+        subtitle={overdueCount ? plural(overdueCount, 'overdue task') : 'Everything you plan, day by day'}
+        actions={<NavSquare icon={Plus} label="New task" onClick={() => openDialog({ kind: 'task', date: t })} />}
       >
-        <Segmented label="Task view" value={view} onChange={setView} options={VIEWS} className="mt-3 w-full" size="sm" />
+        <Segmented label="Task view" value={view} onChange={setView} options={VIEWS} className="mt-3 w-full" />
       </PageHeader>
 
-      <div className="mb-4 flex flex-col gap-2">
-        <div className="relative">
-          <Search size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" aria-hidden />
-          <Input
-            type="search"
-            aria-label="Search tasks"
-            placeholder="Search tasks"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-10"
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <MetricTile
+          icon={CircleCheck}
+          label="Today"
+          value={todayStats.total ? `${todayStats.done} / ${todayStats.total}` : '0'}
+          sub={todayStats.total ? `${todayStats.percent}% done` : 'Nothing scheduled'}
+        />
+        <MetricTile
+          icon={AlarmClock}
+          label="Overdue"
+          value={overdueCount}
+          sub={overdueCount ? 'Tap to review' : 'All caught up'}
+          onClick={overdueCount && view !== 'overdue' ? () => setView('overdue') : undefined}
+          className={overdueCount ? 'border-warn/40' : undefined}
+        />
+      </div>
+
+      <div className="mb-3 flex flex-col gap-2">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" aria-hidden />
+            <Input type="search" aria-label="Search tasks" placeholder="Search tasks" value={query} onChange={(e) => setQuery(e.target.value)} className="h-10 pl-10" />
+          </div>
+          <NavSquare
+            icon={SlidersHorizontal}
+            label={showFilters ? 'Hide filters' : 'Show filters'}
+            active={showFilters || selectFilters}
+            onClick={() => setShowFilters((v) => !v)}
           />
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <Select aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value as 'any' | Priority)} className="h-10 text-sm">
-            <option value="any">Priority</option>
-            <option value="high">High</option>
-            <option value="normal">Normal</option>
-            <option value="low">Low</option>
-          </Select>
-          <Select aria-label="Category" value={category} onChange={(e) => setCategory(e.target.value)} className="h-10 text-sm">
-            <option value="any">Category</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </Select>
-          <Select aria-label="Date range" value={range} onChange={(e) => setRange(e.target.value as Range)} className="h-10 text-sm">
-            <option value="any">Any date</option>
-            <option value="today">Today</option>
-            <option value="next7">Next 7 days</option>
-            <option value="week">This week</option>
-            <option value="month">This month</option>
-          </Select>
-        </div>
+        {showFilters && (
+          <div className="grid grid-cols-3 gap-2">
+            <Select aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value as 'any' | Priority)} className="h-10 rounded-full text-sm">
+              <option value="any">Priority</option>
+              <option value="high">High</option>
+              <option value="normal">Normal</option>
+              <option value="low">Low</option>
+            </Select>
+            <Select aria-label="Category" value={category} onChange={(e) => setCategory(e.target.value)} className="h-10 rounded-full text-sm">
+              <option value="any">Category</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+            <Select aria-label="Date range" value={range} onChange={(e) => setRange(e.target.value as Range)} className="h-10 rounded-full text-sm">
+              {(Object.keys(RANGE_LABEL) as Range[]).map((r) => (
+                <option key={r} value={r}>
+                  {RANGE_LABEL[r]}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+        {!showFilters && selectFilters && (
+          <div className="flex flex-wrap gap-1.5">
+            {priority !== 'any' && (
+              <Chip active onClick={() => setPriority('any')}>
+                <span className="capitalize">{priority}</span> priority <X size={12} aria-label="Clear" />
+              </Chip>
+            )}
+            {category !== 'any' && (
+              <Chip active onClick={() => setCategory('any')}>
+                {category} <X size={12} aria-label="Clear" />
+              </Chip>
+            )}
+            {range !== 'any' && (
+              <Chip active onClick={() => setRange('any')}>
+                {RANGE_LABEL[range]} <X size={12} aria-label="Clear" />
+              </Chip>
+            )}
+          </div>
+        )}
       </div>
 
       {all === undefined ? (
@@ -214,15 +273,7 @@ export default function TasksPage() {
           description={filtersActive ? 'Try clearing a filter or the search.' : undefined}
           action={
             filtersActive ? (
-              <Button
-                size="sm"
-                onClick={() => {
-                  setPriority('any')
-                  setCategory('any')
-                  setRange('any')
-                  setQuery('')
-                }}
-              >
+              <Button size="sm" onClick={clearFilters}>
                 Clear filters
               </Button>
             ) : view !== 'completed' && view !== 'overdue' ? (
@@ -233,57 +284,69 @@ export default function TasksPage() {
           }
         />
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-3">
           {shownGroups.map((g) => {
             const st = taskStats(g.tasks)
+            const late = g.date < t && view !== 'completed'
+            const rel = relativeDayLabel(g.date, settings.dateFormat)
+            const label = ['Today', 'Yesterday', 'Tomorrow'].includes(rel) ? `${rel} · ${formatDate(g.date, 'EEE d MMM')}` : rel
             return (
-              <section key={g.date} aria-labelledby={`g-${g.date}`}>
-                <div className="mb-1 flex items-baseline justify-between px-1">
-                  <h2 id={`g-${g.date}`} className={g.date < t && view !== 'completed' ? 'text-[13px] font-semibold text-warn' : 'text-[13px] font-semibold text-muted'}>
-                    {relativeDayLabel(g.date, settings.dateFormat)}
-                  </h2>
-                  <span className="text-xs text-faint tabular-nums">
-                    {view === 'all' ? `${st.done}/${st.total} done` : plural(g.tasks.length, 'task')}
-                  </span>
-                </div>
-                <ul className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-1">
-                  {g.tasks.map((task, idx) => (
-                    <li key={task.id} className={idx ? 'border-t border-line' : undefined}>
-                      <TaskItem
-                        task={task}
-                        overdue={!task.completed && task.date < t}
-                        onOpen={() => openDialog({ kind: 'task', task })}
-                        actions={
-                          <div className="flex shrink-0 items-center">
-                            {g.tasks.length > 1 && !task.completed && (
-                              <>
-                                <IconButton icon={ArrowUp} label={`Move "${task.title}" up`} size="sm" disabled={idx === 0} onClick={() => reorder(task, -1)} />
+              <Card key={g.date} className="px-3 pt-1.5 pb-1">
+                <section aria-labelledby={`g-${g.date}`}>
+                  <div className="flex h-9 items-center gap-2">
+                    <h2 id={`g-${g.date}`} className={late ? 'text-[13px] font-semibold text-warn' : 'text-[13px] font-semibold'}>
+                      {label}
+                    </h2>
+                    <span className="text-xs text-faint tabular-nums">{view === 'all' ? `${st.done}/${st.total} done` : plural(g.tasks.length, 'task')}</span>
+                    {view !== 'completed' && (
+                      <button
+                        type="button"
+                        onClick={() => openDialog({ kind: 'task', date: g.date })}
+                        className="ml-auto text-[13px] font-semibold text-accent hover:underline"
+                      >
+                        + Add
+                      </button>
+                    )}
+                  </div>
+                  <ul>
+                    {g.tasks.map((task, idx) => (
+                      <li key={task.id} className={idx ? 'border-t border-line' : undefined}>
+                        <TaskItem
+                          task={task}
+                          overdue={!task.completed && task.date < t}
+                          onOpen={() => openDialog({ kind: 'task', task })}
+                          actions={
+                            <div className="flex shrink-0 items-center">
+                              {g.tasks.length > 1 && !task.completed && (
+                                <>
+                                  <IconButton icon={ArrowUp} label={`Move "${task.title}" up`} size="sm" disabled={idx === 0} onClick={() => reorder(task, -1)} />
+                                  <IconButton
+                                    icon={ArrowDown}
+                                    label={`Move "${task.title}" down`}
+                                    size="sm"
+                                    disabled={idx === g.tasks.length - 1 || g.tasks[idx + 1]?.completed}
+                                    onClick={() => reorder(task, 1)}
+                                  />
+                                </>
+                              )}
+                              {!task.completed && (
                                 <IconButton
-                                  icon={ArrowDown}
-                                  label={`Move "${task.title}" down`}
+                                  icon={CalendarClock}
+                                  label={`Move "${task.title}" to another date`}
                                   size="sm"
-                                  disabled={idx === g.tasks.length - 1 || g.tasks[idx + 1]?.completed}
-                                  onClick={() => reorder(task, 1)}
+                                  active={movingId === task.id}
+                                  onClick={() => setMovingId(movingId === task.id ? null : task.id)}
                                 />
-                              </>
-                            )}
-                            {!task.completed && (
-                              <IconButton
-                                icon={CalendarClock}
-                                label={`Move "${task.title}" to another date`}
-                                size="sm"
-                                active={movingId === task.id}
-                                onClick={() => setMovingId(movingId === task.id ? null : task.id)}
-                              />
-                            )}
-                          </div>
-                        }
-                      />
-                      {movingId === task.id && <MoveRow task={task} onDone={() => setMovingId(null)} />}
-                    </li>
-                  ))}
-                </ul>
-              </section>
+                              )}
+                            </div>
+                          }
+                        />
+                        {movingId === task.id && <MoveRow task={task} onDone={() => setMovingId(null)} />}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </Card>
             )
           })}
           {count < filtered.length && (

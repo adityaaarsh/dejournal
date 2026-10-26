@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Bot, CalendarDays, ChevronRight, FileUp, Map, RefreshCw, Trash2, TriangleAlert, Unplug } from 'lucide-react'
 import { db } from '@/db/db'
 import type { IntegrationConnection } from '@/db/types'
-import { Button, Card, Chip, Notice, Page, PageHeader } from '@/components/ui'
+import { Button, Card, Chip, IconTile, Notice, Page, PageHeader, RECORD_TONE, SectionLabel } from '@/components/ui'
 import { confirmDialog, toast } from '@/stores/ui'
 import { useSettings } from '@/stores/settings'
 import { importIcsText, removeConnection } from '@/features/calendar/events'
@@ -13,9 +13,6 @@ import { isNativeApp } from '@/platform/native'
 
 const MAX_ICS_BYTES = 10 * 1024 * 1024
 
-function SectionTitle({ children }: { children: ReactNode }) {
-  return <h2 className="mb-2 px-1 text-xs font-semibold tracking-wider text-faint uppercase">{children}</h2>
-}
 
 function syncedLabel(c: IntegrationConnection): string {
   if (!c.lastSyncAt) return 'Never synced'
@@ -69,13 +66,11 @@ function IcsSection({ connections, counts }: { connections: IntegrationConnectio
   }
 
   return (
-    <Card className="p-4">
+    <Card className="p-3">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted">
-          <FileUp size={19} aria-hidden />
-        </span>
+        <IconTile icon={FileUp} tone={RECORD_TONE.event} size="lg" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-medium">Import a calendar file (.ics)</h3>
+          <h3 className="text-[14px] font-semibold">Import a calendar file (.ics)</h3>
           <p className="mt-0.5 text-[13px] text-muted">
             Export a calendar from Google, Outlook or Apple Calendar as .ics and import it here. Events are stored only on this device and stay
             read-only. Repeating events are expanded one year back and one year ahead.
@@ -153,14 +148,12 @@ function GoogleSection({ connection, count }: { connection?: IntegrationConnecti
   }
 
   return (
-    <Card className="p-4">
+    <Card className="p-3">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted">
-          <CalendarDays size={19} aria-hidden />
-        </span>
+        <IconTile icon={CalendarDays} tone={1} size="lg" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-[15px] font-medium">Google Calendar</h3>
+            <h3 className="text-[14px] font-semibold">Google Calendar</h3>
             {connection ? <StatusChip c={connection} /> : !clientId ? <Chip>Setup required</Chip> : null}
           </div>
           <p className="mt-0.5 text-[13px] text-muted">Read-only. DeJournal shows your Google events from the last 30 days to the next 90 and never changes them.</p>
@@ -233,18 +226,16 @@ function GoogleSection({ connection, count }: { connection?: IntegrationConnecti
 
 /* ------------------------------------------------------------------ */
 
-function LinkCard({ to, icon: Icon, title, description, status }: { to: string; icon: typeof Bot; title: string; description: string; status?: ReactNode }) {
+function LinkCard({ to, icon, tone, title, description, status }: { to: string; icon: typeof Bot; tone: 1 | 2 | 3 | 4 | 5; title: string; description: string; status?: ReactNode }) {
   return (
-    <Link to={to} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 transition-colors hover:bg-surface-2">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted">
-        <Icon size={19} aria-hidden />
-      </span>
+    <Link to={to} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 transition-colors hover:bg-surface-2">
+      <IconTile icon={icon} tone={tone} size="lg" />
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-2 text-[15px] font-medium">
+        <span className="flex flex-wrap items-center gap-2 text-[14px] font-semibold">
           {title}
           {status}
         </span>
-        <span className="block text-[13px] text-muted">{description}</span>
+        <span className="block text-xs text-muted">{description}</span>
       </span>
       <ChevronRight size={16} className="shrink-0 text-faint" aria-hidden />
     </Link>
@@ -267,20 +258,21 @@ export default function IntegrationsPage() {
   return (
     <Page>
       <PageHeader title="Integrations" back="/more" subtitle="Optional connections. DeJournal works fully without them." />
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
         <section>
-          <SectionTitle>Calendars</SectionTitle>
-          <div className="flex flex-col gap-3">
+          <SectionLabel>Calendars</SectionLabel>
+          <div className="flex flex-col gap-2">
             <IcsSection connections={ics} counts={counts ?? {}} />
             <GoogleSection connection={google} count={google ? (counts?.[google.id] ?? 0) : 0} />
           </div>
         </section>
 
         <section>
-          <SectionTitle>Assistant</SectionTitle>
+          <SectionLabel>Assistant</SectionLabel>
           <LinkCard
             to="/settings#ai"
             icon={Bot}
+            tone={5}
             title="AI assistant"
             description="Optional summaries and reflections. Configure provider and consent in Settings."
             status={<Chip tone={settings.aiEnabled ? 'success' : 'default'}>{settings.aiEnabled ? 'On' : 'Off'}</Chip>}
@@ -288,10 +280,11 @@ export default function IntegrationsPage() {
         </section>
 
         <section>
-          <SectionTitle>Maps</SectionTitle>
+          <SectionLabel>Maps</SectionLabel>
           <LinkCard
             to="/places"
             icon={Map}
+            tone={3}
             title="Places & map"
             description="Save places you visit and see them on an OpenStreetMap map. Location access is optional."
             status={<Chip tone={settings.locationEnabled ? 'success' : 'default'}>{settings.locationEnabled ? 'Location on' : 'Manual only'}</Chip>}

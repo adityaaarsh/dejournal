@@ -268,6 +268,8 @@ export interface SavedPlace extends BaseRecord {
 export interface ScreenTimeRecord extends BaseRecord {
   date: ISODate // unique
   minutes: number
+  /** Minutes per app category (Social, Video, …) when imported from the phone. */
+  breakdown?: Record<string, number> | null
   note?: string
   source: 'manual' | 'import'
 }

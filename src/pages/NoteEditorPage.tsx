@@ -17,7 +17,7 @@ import {
   Trash,
   X,
 } from 'lucide-react'
-import { EmptyState, Field, IconButton, LoadingState, Page, PageHeader, Segmented, TagInput } from '@/components/ui'
+import { Card, EmptyState, Field, IconButton, LoadingState, NavSquare, Page, PageHeader, Segmented, TagInput } from '@/components/ui'
 import { db } from '@/db/db'
 import { createRecord, removeWithUndo, updateRecord } from '@/db/repo'
 import type { Note } from '@/db/types'
@@ -214,20 +214,20 @@ function Editor({ routeId, onCreated }: { routeId: string; onCreated: (id: strin
             <span
               aria-live="polite"
               className={cn(
-                'mr-1 inline-flex items-center gap-1 text-xs',
+                'mr-0.5 inline-flex items-center gap-1 text-xs',
                 saveState === 'error' ? 'text-danger' : 'text-faint',
               )}
             >
               {saveState === 'saved' && <Check size={12} aria-hidden />}
               {saveLabel}
             </span>
-            <IconButton
+            <NavSquare
               icon={fields.pinned ? PinOff : Pin}
               label={fields.pinned ? 'Unpin' : 'Pin'}
               active={fields.pinned}
               onClick={() => change({ pinned: !fields.pinned }, true)}
             />
-            <IconButton
+            <NavSquare
               icon={fields.archived ? ArchiveRestore : Archive}
               label={fields.archived ? 'Unarchive' : 'Archive'}
               onClick={() => {
@@ -236,13 +236,13 @@ function Editor({ routeId, onCreated }: { routeId: string; onCreated: (id: strin
               }}
               disabled={!idRef.current && !fields.title && !fields.content}
             />
-            <IconButton icon={Trash} label="Delete note" variant="danger" onClick={remove} disabled={!idRef.current} />
+            <NavSquare icon={Trash} label="Delete note" onClick={remove} disabled={!idRef.current} className="hover:text-danger" />
           </>
         }
       />
 
       {fields.archived && (
-        <p className="mb-3 rounded-xl bg-surface-2 px-3 py-2 text-[13px] text-muted">This note is archived. It stays searchable.</p>
+        <p className="mb-3 rounded-2xl border border-line bg-surface px-3 py-2 text-[13px] text-muted">This note is archived. It stays searchable.</p>
       )}
 
       <input
@@ -252,10 +252,10 @@ function Editor({ routeId, onCreated }: { routeId: string; onCreated: (id: strin
         aria-label="Note title"
         maxLength={200}
         autoFocus={isNew}
-        className="w-full bg-transparent text-2xl font-semibold tracking-tight placeholder:text-faint focus:outline-none focus-visible:outline-none"
+        className="w-full bg-transparent font-display text-[22px] leading-tight font-semibold tracking-tight placeholder:text-faint focus:outline-none focus-visible:outline-none"
       />
 
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,200px)_1fr]">
+      <Card className="mt-3 grid grid-cols-1 gap-3 p-3 sm:grid-cols-[minmax(0,200px)_1fr]">
         <Field label="Day" optional>
           {(p) => (
             <div className="flex items-center gap-1">
@@ -273,25 +273,35 @@ function Editor({ routeId, onCreated }: { routeId: string; onCreated: (id: strin
         <Field label="Tags" optional>
           {(p) => <TagInput id={p.id} value={fields.tags} onChange={(tags) => change({ tags }, true)} />}
         </Field>
-      </div>
+      </Card>
       {isISODate(fields.date) && (
         <Link to={`/?d=${fields.date}`} className="mt-2 inline-flex items-center gap-1 text-xs text-accent hover:underline">
           <CalendarDays size={12} aria-hidden /> Open {relativeDayLabel(fields.date, settings.dateFormat)}
         </Link>
       )}
 
-      <div className="sticky top-[calc(max(env(safe-area-inset-top),12px)+56px)] z-10 mt-4 flex items-center gap-1 border-b border-line bg-bg/95 py-1.5 backdrop-blur">
+      <div className="sticky top-[calc(max(env(safe-area-inset-top),10px)+56px)] z-10 mt-3 flex items-center gap-2 bg-bg py-2">
         {mode === 'write' && (
-          <div role="toolbar" aria-label="Formatting" className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto scrollbar-none">
+          <div role="toolbar" aria-label="Formatting" className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto rounded-full border border-line bg-surface p-1 scrollbar-none">
             {TOOLBAR.map((t) => (
-              <IconButton key={t.action} icon={t.icon} label={t.label} size="sm" onMouseDown={(e) => e.preventDefault()} onClick={() => format(t.action)} />
+              <button
+                key={t.action}
+                type="button"
+                aria-label={t.label}
+                title={t.label}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => format(t.action)}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-text"
+              >
+                <t.icon size={16} strokeWidth={2} aria-hidden />
+              </button>
             ))}
           </div>
         )}
         <Segmented
           label="Editor mode"
           size="sm"
-          className="ml-auto"
+          className="ml-auto shrink-0"
           value={mode}
           onChange={setMode}
           options={[
@@ -301,6 +311,7 @@ function Editor({ routeId, onCreated }: { routeId: string; onCreated: (id: strin
         />
       </div>
 
+      <Card className="px-4 py-3">
       {mode === 'write' ? (
         <textarea
           ref={textRef}
@@ -308,13 +319,14 @@ function Editor({ routeId, onCreated }: { routeId: string; onCreated: (id: strin
           onChange={(e) => change({ content: e.target.value })}
           aria-label="Note content"
           placeholder="Start writing… Use **bold**, _italic_, # headings, - lists and - [ ] checklists."
-          className="mt-3 w-full resize-none bg-transparent text-[15px] leading-relaxed placeholder:text-faint focus:outline-none focus-visible:outline-none"
+          className="w-full resize-none bg-transparent text-[15px] leading-relaxed placeholder:text-faint focus:outline-none focus-visible:outline-none"
         />
       ) : fields.content.trim() ? (
-        <Markdown source={fields.content} className="mt-4" />
+        <Markdown source={fields.content} />
       ) : (
-        <p className="mt-4 text-sm text-faint">Nothing to preview yet.</p>
+        <p className="text-sm text-faint">Nothing to preview yet.</p>
       )}
+      </Card>
     </Page>
   )
 }

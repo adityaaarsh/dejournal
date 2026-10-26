@@ -1,17 +1,20 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Lightbulb, ThumbsDown, ThumbsUp, X } from 'lucide-react'
+import { Lightbulb, Play, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import type { ISODate } from '@/db/types'
 import type { Recommendation } from '@/domain/recommendations'
 import { openDialog, toast } from '@/stores/ui'
 import { cn } from '@/lib/text'
 import { recordRecFeedback } from './useRecommendation'
 
-/** One compact, dismissible suggestion grounded in recorded data. */
+/**
+ * One compact, dismissible suggestion grounded in recorded data. Tap the text
+ * to see why it was suggested and to rate it.
+ */
 export function RecommendationCard({ rec, date }: { rec: Recommendation; date: ISODate }) {
   const navigate = useNavigate()
   const [rated, setRated] = useState<'helpful' | 'unhelpful' | null>(null)
-  const [why, setWhy] = useState(false)
+  const [open, setOpen] = useState(false)
 
   const act = async () => {
     if (!rec.action) return
@@ -39,61 +42,54 @@ export function RecommendationCard({ rec, date }: { rec: Recommendation; date: I
   }
 
   return (
-    <section
-      aria-label="Suggestion for today"
-      className="dj-fade-in rounded-[var(--radius-card)] border border-warn-line bg-warn-soft p-3.5 pr-2"
-    >
-      <div className="flex items-start gap-3">
-        <Lightbulb size={18} strokeWidth={1.9} className="mt-0.5 shrink-0 text-warn" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className="text-[14px] leading-snug text-warn">{rec.message}</p>
-          {why && <p className="mt-1.5 text-xs text-muted">Based on: {rec.reason}</p>}
-          <div className="mt-2.5 flex flex-wrap items-center gap-1">
-            {rec.action && (
-              <button
-                type="button"
-                onClick={act}
-                className="mr-1 h-8 rounded-lg bg-warn/15 px-3 text-[13px] font-medium text-warn hover:bg-warn/25"
-              >
-                {rec.action.label}
-              </button>
-            )}
-            <button type="button" onClick={() => setWhy((w) => !w)} className="h-8 rounded-lg px-2 text-xs text-muted hover:text-text">
-              {why ? 'Hide reason' : 'Why?'}
-            </button>
-            <span className="ml-auto flex items-center">
-              <button
-                type="button"
-                aria-label="Helpful"
-                aria-pressed={rated === 'helpful'}
-                onClick={() => feedback('helpful')}
-                disabled={!!rated}
-                className={cn('grid h-8 w-8 place-items-center rounded-lg text-muted hover:text-text disabled:opacity-60', rated === 'helpful' && 'text-warn')}
-              >
-                <ThumbsUp size={15} aria-hidden />
-              </button>
-              <button
-                type="button"
-                aria-label="Not helpful"
-                aria-pressed={rated === 'unhelpful'}
-                onClick={() => feedback('unhelpful')}
-                disabled={!!rated}
-                className={cn('grid h-8 w-8 place-items-center rounded-lg text-muted hover:text-text disabled:opacity-60', rated === 'unhelpful' && 'text-warn')}
-              >
-                <ThumbsDown size={15} aria-hidden />
-              </button>
-            </span>
-          </div>
-        </div>
+    <section aria-label="Suggestion for today" className="dj-fade-in rounded-[var(--radius-card)] border border-line bg-surface">
+      <div className="flex items-center gap-2.5 py-2 pr-1.5 pl-3">
+        <Lightbulb size={17} strokeWidth={1.9} className="shrink-0 text-accent" aria-hidden />
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="line-clamp-2 min-w-0 flex-1 text-left text-[13px] leading-snug text-text/90"
+        >
+          {rec.message}
+        </button>
+        {rec.action && (
+          <button
+            type="button"
+            onClick={act}
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-surface-2 px-3 text-xs font-semibold whitespace-nowrap text-accent hover:bg-surface-3"
+          >
+            {rec.action.kind === 'study' && <Play size={11} fill="currentColor" aria-hidden />}
+            {rec.action.label}
+          </button>
+        )}
         <button
           type="button"
           aria-label="Dismiss suggestion"
           onClick={() => recordRecFeedback(rec.ruleId, date, 'dismissed')}
-          className="-mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:text-text"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-faint hover:text-text"
         >
-          <X size={17} aria-hidden />
+          <X size={15} aria-hidden />
         </button>
       </div>
+      {open && (
+        <div className="flex items-center gap-2 border-t border-line px-3 py-2 text-xs text-muted">
+          <span className="min-w-0 flex-1">Based on: {rec.reason}</span>
+          {(['helpful', 'unhelpful'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-label={v === 'helpful' ? 'Helpful' : 'Not helpful'}
+              aria-pressed={rated === v}
+              onClick={() => feedback(v)}
+              disabled={!!rated}
+              className={cn('grid h-8 w-8 place-items-center rounded-lg hover:text-text disabled:opacity-60', rated === v && 'text-accent')}
+            >
+              {v === 'helpful' ? <ThumbsUp size={14} aria-hidden /> : <ThumbsDown size={14} aria-hidden />}
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   )
 }

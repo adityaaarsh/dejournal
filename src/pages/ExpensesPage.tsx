@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronLeft, ChevronRight, Plus, Tag, Target, TriangleAlert, Wallet } from 'lucide-react'
+import { CalendarArrowUp, Plus, Tag, Target, TrendingUp, TriangleAlert, Wallet } from 'lucide-react'
 import { db } from '@/db/db'
 import type { Expense } from '@/db/types'
 import {
@@ -10,7 +10,6 @@ import {
   dateRange,
   formatDate,
   formatMonth,
-  formatTime,
   isISODate,
   monthEnd,
   monthKey,
@@ -20,25 +19,42 @@ import {
   weekRange,
 } from '@/lib/dates'
 import { formatMoney } from '@/lib/money'
-import { averageDaily, budgetStatus, elapsedDays, highestDay, splitByCurrency, total, totalsByCategory, totalsByDay, type BudgetStatus } from '@/domain/expenses'
+import { cn } from '@/lib/text'
+import {
+  averageDaily,
+  budgetStatus,
+  elapsedDays,
+  highestDay,
+  spendLevel,
+  splitByCurrency,
+  total,
+  totalsByCategory,
+  totalsByDay,
+  type BudgetStatus,
+  type SpendLevel,
+} from '@/domain/expenses'
 import { describeChange, previousPeriod } from '@/domain/study'
 import { useSettings } from '@/stores/settings'
 import { openDialog } from '@/stores/ui'
-import { BreakdownBars, ChartCard, ColumnChart } from '@/components/charts/Charts'
-import { Button, Card, EmptyState, IconButton, LoadingState, Notice, Page, PageHeader, ProgressBar, Segmented, StatTile } from '@/components/ui'
-import { CategoryIcon } from '@/features/expenses/categoryIcons'
+import { ChartCard, ColumnChart } from '@/components/charts/Charts'
+import { Button, Card, EmptyState, LoadingState, MetricTile, NavSquare, Notice, Page, PageHeader, ProgressBar, RECORD_TONE, SectionLabel, Segmented, TimelineRow } from '@/components/ui'
+import { CategoryIcon, categoryIcon } from '@/features/expenses/categoryIcons'
 import { categoryMap, useCategories } from '@/features/expenses/expenses'
 import { CategoriesSheet } from '@/features/expenses/CategoriesSheet'
 import { BudgetSheet } from '@/features/expenses/BudgetSheet'
+import { CardHead, PeriodRow } from '@/features/study/PeriodRow'
 
 type Range = 'day' | 'week' | 'month'
+
+/** A day's spending colour: green under 100, yellow under 400, red from 400. */
+const LEVEL_TEXT: Record<SpendLevel, string> = { low: 'text-success', mid: 'text-warn', high: 'text-danger' }
 
 function BudgetRow({ label, status, currency, icon }: { label: string; status: BudgetStatus; currency: string; icon?: React.ReactNode }) {
   const pct = Math.round(status.ratio * 100)
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between gap-2 text-[13px]">
-        <span className="flex min-w-0 items-center gap-1.5 truncate">
+        <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold">
           {icon}
           {label}
         </span>
@@ -151,71 +167,89 @@ export default function ExpensesPage() {
   }
 
   const addDate = range === 'day' ? anchor : isCurrent ? todayDate : period.end < todayDate ? period.end : period.start
+  const headlineColor = range === 'day' ? LEVEL_TEXT[spendLevel(periodTotal, currency)] : ''
 
   return (
     <Page>
       <PageHeader
         back="/more"
         title="Expenses"
+        subtitle="Logged by hand"
         actions={
           <>
-            <IconButton icon={Tag} label="Manage categories" onClick={() => setSheet('categories')} />
-            <IconButton icon={Target} label="Edit budgets" onClick={() => setSheet('budget')} />
-            <IconButton icon={Plus} label="Add expense" onClick={() => openDialog({ kind: 'expense', date: addDate })} />
+            <NavSquare icon={Tag} label="Manage categories" onClick={() => setSheet('categories')} />
+            <NavSquare icon={Target} label="Edit budgets" onClick={() => setSheet('budget')} />
+            <NavSquare icon={Plus} label="Add expense" onClick={() => openDialog({ kind: 'expense', date: addDate })} />
           </>
         }
       />
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Segmented
-            label="Period"
-            value={range}
-            onChange={setRange}
-            className="w-full"
-            options={[
-              { value: 'day', label: 'Day' },
-              { value: 'week', label: 'Week' },
-              { value: 'month', label: 'Month' },
-            ]}
-          />
-          <div className="flex items-center justify-between">
-            <IconButton icon={ChevronLeft} label={`Previous ${range}`} onClick={() => shift(-1)} />
-            <div className="text-center">
-              <div className="text-sm font-medium">{periodTitle}</div>
-              {!isCurrent && (
-                <button type="button" className="text-xs text-accent hover:underline" onClick={() => setAnchor(todayDate)}>
-                  Back to today
-                </button>
-              )}
-            </div>
-            <IconButton icon={ChevronRight} label={`Next ${range}`} onClick={() => shift(1)} />
-          </div>
-        </div>
+      <div className="flex flex-col gap-3">
+        <Segmented
+          label="Period"
+          value={range}
+          onChange={setRange}
+          className="w-full"
+          options={[
+            { value: 'day', label: 'Day' },
+            { value: 'week', label: 'Week' },
+            { value: 'month', label: 'Month' },
+          ]}
+        />
+        <PeriodRow
+          title={periodTitle}
+          subtitle={
+            isCurrent ? (
+              `${periodItems.length} ${periodItems.length === 1 ? 'expense' : 'expenses'}`
+            ) : (
+              <button type="button" className="text-accent hover:underline" onClick={() => setAnchor(todayDate)}>
+                Back to today
+              </button>
+            )
+          }
+          onPrev={() => shift(-1)}
+          onNext={() => shift(1)}
+          prevLabel={`Previous ${range}`}
+          nextLabel={`Next ${range}`}
+        />
 
-        <Card className="p-5">
-          <div className="text-[13px] text-muted">{range === 'day' ? 'Spent' : 'Total spent'}</div>
-          <div className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{formatMoney(periodTotal, currency)}</div>
-          <div className="mt-1 text-xs text-faint">
-            {periodItems.length} {periodItems.length === 1 ? 'expense' : 'expenses'}
-            {(periodTotal > 0 || prevTotal > 0) && ` · ${describeChange(periodTotal, prevTotal, prevLabel)}`}
+        <Card className="flex items-center gap-3 p-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+              <Wallet size={13} strokeWidth={2.1} aria-hidden /> {range === 'day' ? 'Spent' : 'Total spent'}
+            </div>
+            <div className={cn('mt-2 font-display text-[30px] leading-none font-semibold tracking-tight tabular-nums', headlineColor)}>{formatMoney(periodTotal, currency)}</div>
+            <div className="mt-1.5 text-xs text-muted">
+              {periodItems.length} {periodItems.length === 1 ? 'expense' : 'expenses'}
+              {(periodTotal > 0 || prevTotal > 0) && ` · ${describeChange(periodTotal, prevTotal, prevLabel)}`}
+            </div>
+            {otherInPeriod.length > 0 && (
+              <p className="mt-2 text-xs text-faint">
+                {otherInPeriod.length} {otherInPeriod.length === 1 ? 'expense' : 'expenses'} in other currencies {otherInPeriod.length === 1 ? 'is' : 'are'} listed below but not included in totals.
+              </p>
+            )}
           </div>
-          {otherInPeriod.length > 0 && (
-            <p className="mt-2 text-xs text-faint">
-              {otherInPeriod.length} {otherInPeriod.length === 1 ? 'expense' : 'expenses'} in other currencies {otherInPeriod.length === 1 ? 'is' : 'are'} listed below but not included in totals.
-            </p>
-          )}
+          <button
+            type="button"
+            onClick={() => openDialog({ kind: 'expense', date: addDate })}
+            aria-label="Add expense"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-[14px] bg-accent text-on-accent transition-transform active:scale-95"
+          >
+            <Plus size={20} strokeWidth={2.4} aria-hidden />
+          </button>
         </Card>
 
         {range !== 'day' && (
-          <div className="grid grid-cols-2 gap-3">
-            <StatTile
-              label="Average per day"
+          <div className="grid grid-cols-2 gap-2">
+            <MetricTile
+              icon={TrendingUp}
+              label="Per day"
               value={avg === null ? '—' : formatMoney(avg, currency)}
               sub={avg === null ? 'Period hasn’t started' : `Total ÷ ${elapsed} ${elapsed === 1 ? 'day' : 'days'}${isCurrent ? ' so far' : ''}`}
             />
-            <StatTile
+            <MetricTile
+              icon={CalendarArrowUp}
               label="Highest day"
-              value={peak ? formatMoney(peak.amount, currency) : '—'}
+              value={peak ? <span className={LEVEL_TEXT[spendLevel(peak.amount, currency)]}>{formatMoney(peak.amount, currency)}</span> : '—'}
               sub={peak ? formatDate(peak.date, 'EEE, d MMM') : 'No spending recorded'}
               onClick={
                 peak
@@ -238,14 +272,14 @@ export default function ExpensesPage() {
         ))}
 
         {hasBudgets && (
-          <Card className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[15px] font-medium">{formatMonth(budgetMonth, 'MMMM')} budget</h2>
-              <button type="button" className="text-[13px] font-medium text-accent hover:underline" onClick={() => setSheet('budget')}>
+          <Card className="px-3 py-2">
+            <div className="flex items-center gap-2 px-0.5 pt-1 pb-2">
+              <h2 className="min-w-0 flex-1 text-[14px] font-semibold">{formatMonth(budgetMonth, 'MMMM')} budget</h2>
+              <button type="button" className="rounded-lg px-1.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent-soft" onClick={() => setSheet('budget')}>
                 Edit
               </button>
             </div>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 pb-2">
               {monthStatus.level !== 'none' && <BudgetRow label="All spending" status={monthStatus} currency={currency} />}
               {catStatuses.map(({ id, status }) => (
                 <BudgetRow
@@ -267,24 +301,32 @@ export default function ExpensesPage() {
         )}
 
         {byCategory.length > 0 && (
-          <Card className="p-4">
-            <h2 className="mb-3 text-[15px] font-medium">By category</h2>
-            <BreakdownBars
-              formatValue={(v) => formatMoney(v, currency)}
-              items={byCategory.map((c) => ({
-                key: c.categoryId,
-                label: cats.get(c.categoryId)?.name ?? 'Other',
-                value: c.amount,
-                icon: <CategoryIcon name={cats.get(c.categoryId)?.icon} size={14} className="text-muted" />,
-              }))}
-            />
+          <Card className="px-3 py-2">
+            <CardHead title="By category" meta={formatMoney(periodTotal, currency)} />
+            <ul>
+              {byCategory.map((c) => {
+                const cat = cats.get(c.categoryId)
+                const pct = periodTotal > 0 ? Math.round((c.amount / periodTotal) * 100) : 0
+                return (
+                  <li key={c.categoryId}>
+                    <TimelineRow
+                      icon={categoryIcon(cat?.icon)}
+                      tone={RECORD_TONE.expense}
+                      title={cat?.name ?? 'Other'}
+                      subtitle={`${pct}% · ${c.count} ${c.count === 1 ? 'expense' : 'expenses'}`}
+                      trailing={<span className="shrink-0 text-[13px] font-semibold tabular-nums">{formatMoney(c.amount, currency)}</span>}
+                    />
+                  </li>
+                )
+              })}
+            </ul>
           </Card>
         )}
 
-        <section aria-labelledby="exp-list">
-          <h2 id="exp-list" className="mb-2 text-[17px] font-semibold tracking-tight">
-            Expenses
-          </h2>
+        <section aria-labelledby="exp-list" className="flex flex-col gap-2">
+          <SectionLabel>
+            <span id="exp-list">Expenses</span>
+          </SectionLabel>
           {groups.length === 0 ? (
             <EmptyState
               icon={Wallet}
@@ -297,40 +339,30 @@ export default function ExpensesPage() {
               }
             />
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
               {groups.map((g) => {
                 const dayTotal = total(g.items.filter((e) => e.currency === currency))
                 return (
-                  <Card key={g.date} className="px-2 py-2">
-                    {range !== 'day' && (
-                      <div className="flex items-center justify-between px-2 pt-1 pb-1 text-[13px]">
-                        <span className="font-medium text-muted">{relativeDayLabel(g.date, settings.dateFormat)}</span>
-                        <span className="text-faint tabular-nums">{formatMoney(dayTotal, currency)}</span>
-                      </div>
-                    )}
+                  <Card key={g.date} className="px-3 py-2">
+                    <CardHead
+                      title={relativeDayLabel(g.date, settings.dateFormat)}
+                      meta={<span className={LEVEL_TEXT[spendLevel(dayTotal, currency)]}>{formatMoney(dayTotal, currency)}</span>}
+                      onAdd={() => openDialog({ kind: 'expense', date: g.date })}
+                    />
                     <ul>
                       {g.items.map((e) => {
                         const cat = cats.get(e.categoryId)
                         return (
                           <li key={e.id}>
-                            <button
-                              type="button"
+                            <TimelineRow
+                              time={g.items.some((x) => !!x.time) ? (e.time ?? '—') : undefined}
+                              icon={categoryIcon(cat?.icon)}
+                              tone={RECORD_TONE.expense}
+                              title={e.description}
+                              subtitle={[cat?.name ?? 'Other', e.paymentMethod].filter(Boolean).join(' · ')}
+                              trailing={<span className="shrink-0 text-[13px] font-semibold tabular-nums">{formatMoney(e.amount, e.currency)}</span>}
                               onClick={() => openDialog({ kind: 'expense', expense: e })}
-                              className="flex min-h-14 w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-surface-2"
-                            >
-                              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted">
-                                <CategoryIcon name={cat?.icon} />
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[15px]">{e.description}</span>
-                                <span className="block truncate text-xs text-muted">
-                                  {cat?.name ?? 'Other'}
-                                  {e.time ? ` · ${formatTime(e.time)}` : ''}
-                                  {e.paymentMethod ? ` · ${e.paymentMethod}` : ''}
-                                </span>
-                              </span>
-                              <span className="shrink-0 text-[15px] font-medium tabular-nums">{formatMoney(e.amount, e.currency)}</span>
-                            </button>
+                            />
                           </li>
                         )
                       })}

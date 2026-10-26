@@ -5,6 +5,7 @@
  */
 import type { Expense, ISODate } from '@/db/types'
 import { dateRange, diffDays } from '@/lib/dates'
+import { toMajor } from '@/lib/money'
 
 export interface Period {
   start: ISODate
@@ -83,4 +84,18 @@ export function budgetStatus(spent: number, budget: number): BudgetStatus {
   const ratio = spent / budget
   const level: BudgetLevel = ratio > 1 ? 'over' : ratio >= 0.8 ? 'near' : 'ok'
   return { level, spent, budget, ratio, remaining: budget - spent }
+}
+
+/**
+ * Colour level for a day's spending (in the display currency's major units):
+ * green under 100, yellow under 400, red from 400.
+ */
+export type SpendLevel = 'low' | 'mid' | 'high'
+export const SPEND_THRESHOLDS = { mid: 100, high: 400 } as const
+
+export function spendLevel(totalMinor: number, currency: string): SpendLevel {
+  const major = toMajor(totalMinor, currency)
+  if (major < SPEND_THRESHOLDS.mid) return 'low'
+  if (major < SPEND_THRESHOLDS.high) return 'mid'
+  return 'high'
 }

@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { BookOpen, Check, Info, Maximize, Minimize, Pause, Play, Square, Timer, X } from 'lucide-react'
+import { BookOpen, CalendarCheck, Check, Infinity as InfinityIcon, Info, Maximize, Minimize, Pause, Play, SlidersHorizontal, Square, Timer, X } from 'lucide-react'
 import { db } from '@/db/db'
 import { discardTimer, elapsedMs, finishFocusTimer, pauseTimer, resumeTimer, startTimer, useTimer } from '@/db/timers'
 import type { FocusSession } from '@/db/types'
-import { formatTime, isoToLocalTime, relativeDayLabel, today, weekRange } from '@/lib/dates'
+import { isoToLocalTime, relativeDayLabel, today, weekRange } from '@/lib/dates'
 import { formatClock, formatDuration } from '@/lib/duration'
 import { cn } from '@/lib/text'
 import { useSettings } from '@/stores/settings'
 import { confirmDialog, toast } from '@/stores/ui'
-import { Button, Card, EmptyState, Field, Input, Notice, Page, PageHeader, Segmented, Select, StatTile } from '@/components/ui'
+import { Button, Card, EmptyState, Field, IconTile, Input, MetricTile, Notice, Page, PageHeader, RECORD_TONE, SectionLabel, Select, TimelineRow } from '@/components/ui'
+import { CardHead } from '@/features/study/PeriodRow'
 import { SubjectPicker, subjectMap, useSubjects } from '@/features/study/subjects'
 import { createStudySession } from '@/features/study/sessions'
 import { isNativeApp, showNativeNotification } from '@/platform/native'
@@ -17,13 +18,13 @@ import { isNativeApp, showNativeNotification } from '@/platform/native'
 type Preset = '25' | '50' | 'open' | 'custom'
 
 function Ring({ progress, children }: { progress: number | null; children: React.ReactNode }) {
-  const r = 46
+  const r = 44
   const c = 2 * Math.PI * r
   const p = progress === null ? 0 : Math.min(1, Math.max(0, progress))
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[18rem]">
       <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden>
-        <circle cx="50" cy="50" r={r} fill="none" stroke="var(--c-surface-3)" strokeWidth="2.5" />
+        <circle cx="50" cy="50" r={r} fill="none" stroke="var(--c-surface-2)" strokeWidth="5" />
         {progress !== null && (
           <circle
             cx="50"
@@ -31,7 +32,7 @@ function Ring({ progress, children }: { progress: number | null; children: React
             r={r}
             fill="none"
             stroke="var(--c-accent)"
-            strokeWidth="2.5"
+            strokeWidth="5"
             strokeLinecap="round"
             strokeDasharray={c}
             strokeDashoffset={c * (1 - p)}
@@ -115,7 +116,7 @@ function ActiveFocus() {
   return (
     <div ref={containerRef} className={cn('flex flex-col items-center', isFull && 'justify-center bg-bg p-8')}>
       <div className="mb-6 text-center">
-        <p className="text-[15px] font-medium">{timer.label || (planned ? `${Math.round(planned / 60000)} minute focus` : 'Open focus')}</p>
+        <p className="font-display text-[17px] font-semibold tracking-tight">{timer.label || (planned ? `${Math.round(planned / 60000)} minute focus` : 'Open focus')}</p>
         {(task || subject) && (
           <p className="mt-0.5 text-[13px] text-muted">
             {task ? task.title : ''}
@@ -126,22 +127,22 @@ function ActiveFocus() {
       </div>
       <Ring progress={planned === null ? null : elapsed / planned}>
         <span className="text-[13px] text-muted">{done ? 'Time’s up' : running ? (planned ? 'Remaining' : 'Elapsed') : 'Paused'}</span>
-        <span role="timer" aria-live="off" className="mt-1 text-5xl font-semibold tracking-tight tabular-nums">
+        <span role="timer" aria-live="off" className="mt-1 font-display text-[46px] leading-none font-semibold tracking-tight tabular-nums">
           {display}
         </span>
         {done && <span className="mt-1 text-xs text-success">Planned time complete</span>}
       </Ring>
       <div className="mt-8 grid w-full max-w-sm grid-cols-2 gap-2">
         {running ? (
-          <Button size="lg" icon={Pause} block onClick={() => pauseTimer('focus')}>
+          <Button size="lg" icon={Pause} block className="rounded-full!" onClick={() => pauseTimer('focus')}>
             Pause
           </Button>
         ) : (
-          <Button size="lg" variant="subtle" icon={Play} block onClick={() => resumeTimer('focus')}>
+          <Button size="lg" variant="subtle" icon={Play} block className="rounded-full!" onClick={() => resumeTimer('focus')}>
             Resume
           </Button>
         )}
-        <Button size="lg" variant="primary" icon={done ? Check : Square} block loading={busy} onClick={end}>
+        <Button size="lg" variant="primary" icon={done ? Check : Square} block className="rounded-full!" loading={busy} onClick={end}>
           {done ? 'Finish' : 'End'}
         </Button>
       </div>
@@ -171,6 +172,13 @@ function ActiveFocus() {
     </div>
   )
 }
+
+const PRESETS: Array<{ value: Preset; label: string; aria: string; big?: string; icon?: typeof Timer }> = [
+  { value: '25', big: '25', label: 'min', aria: '25 minutes (Pomodoro)' },
+  { value: '50', big: '50', label: 'min', aria: '50 minutes' },
+  { value: 'open', icon: InfinityIcon, label: 'Open', aria: 'Open-ended' },
+  { value: 'custom', icon: SlidersHorizontal, label: 'Custom', aria: 'Custom length' },
+]
 
 function Setup() {
   const [preset, setPreset] = useState<Preset>('25')
@@ -218,23 +226,37 @@ function Setup() {
         }}
       >
         <div>
-          <p id="focus-len" className="mb-1.5 text-[13px] font-medium text-muted">
+          <p id="focus-len" className="mb-2 text-[13px] font-semibold text-muted">
             Length
           </p>
-          <Segmented
-            label="Focus length"
-            value={preset}
-            onChange={setPreset}
-            className="w-full"
-            options={[
-              { value: '25', label: '25 min' },
-              { value: '50', label: '50 min' },
-              { value: 'open', label: 'Open' },
-              { value: 'custom', label: 'Custom' },
-            ]}
-          />
-          {preset === '25' && <p className="mt-1.5 text-xs text-faint">Pomodoro: 25 minutes of focus, then a short break.</p>}
-          {preset === 'open' && <p className="mt-1.5 text-xs text-faint">Counts up until you end it.</p>}
+          <div role="radiogroup" aria-labelledby="focus-len" className="grid grid-cols-4 gap-2">
+            {PRESETS.map((p) => {
+              const on = preset === p.value
+              return (
+                <button
+                  key={p.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={p.aria}
+                  onClick={() => setPreset(p.value)}
+                  className={cn(
+                    'flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border transition-colors',
+                    on ? 'border-accent bg-accent-soft text-text' : 'border-line text-muted hover:bg-surface-2 hover:text-text',
+                  )}
+                >
+                  {p.big ? (
+                    <span className={cn('font-display text-[24px] leading-none font-semibold tabular-nums', on && 'text-accent')}>{p.big}</span>
+                  ) : (
+                    p.icon && <p.icon size={22} strokeWidth={2} className={on ? 'text-accent' : undefined} aria-hidden />
+                  )}
+                  <span className="text-[11px] font-semibold">{p.label}</span>
+                </button>
+              )
+            })}
+          </div>
+          {preset === '25' && <p className="mt-2 text-xs text-faint">Pomodoro: 25 minutes of focus, then a short break.</p>}
+          {preset === 'open' && <p className="mt-2 text-xs text-faint">Counts up until you end it.</p>}
         </div>
         {preset === 'custom' && (
           <Field label="Minutes" error={error}>
@@ -261,7 +283,7 @@ function Setup() {
             {(p) => <SubjectPicker id={p.id} value={subjectId} onChange={setSubjectId} />}
           </Field>
         </div>
-        <Button type="submit" variant="primary" size="lg" icon={Play} loading={busy} block>
+        <Button type="submit" variant="primary" size="lg" icon={Play} loading={busy} block className="rounded-full!">
           Start focus
         </Button>
       </form>
@@ -275,10 +297,8 @@ function FinishedCard({ session, onDone }: { session: FocusSession; onDone: () =
   const [busy, setBusy] = useState(false)
   return (
     <Card className="p-5 text-center">
-      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-success-soft text-success">
-        <Check size={22} aria-hidden />
-      </div>
-      <p className="text-[17px] font-semibold">Focused for {formatDuration(session.durationSec, { seconds: true })}</p>
+      <IconTile icon={Check} tone="success" size="lg" className="mx-auto mb-3" />
+      <p className="font-display text-[17px] font-semibold tracking-tight">Focused for {formatDuration(session.durationSec, { seconds: true })}</p>
       <p className="mt-1 text-[13px] text-muted">{session.completed ? 'You completed the planned time.' : 'Saved to your focus history.'}</p>
       <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
         {subject && !alreadyLogged && (
@@ -357,32 +377,35 @@ export default function FocusPage() {
 
         {!timer && (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <StatTile label="Focused today" value={formatDuration(todaySec)} />
-              <StatTile label="This week" value={formatDuration(weekSec)} />
+            <div className="grid grid-cols-2 gap-2">
+              <MetricTile icon={Timer} label="Focused today" value={formatDuration(todaySec)} />
+              <MetricTile icon={CalendarCheck} label="This week" value={formatDuration(weekSec)} />
             </div>
-            <section aria-labelledby="focus-history">
-              <h2 id="focus-history" className="mb-2 text-[17px] font-semibold tracking-tight">
-                History
-              </h2>
+            <section aria-labelledby="focus-history" className="flex flex-col gap-2">
+              <SectionLabel>
+                <span id="focus-history">History</span>
+              </SectionLabel>
               {history.length === 0 ? (
                 <EmptyState compact icon={Timer} title="No focus sessions yet" />
               ) : (
-                <Card className="px-4">
-                  <ul className="divide-y divide-line">
+                <Card className="px-3 py-2">
+                  <CardHead title="Recent sessions" meta={`${history.length}`} />
+                  <ul>
                     {history.map((s) => (
-                      <li key={s.id} className="flex min-h-14 items-center gap-3 py-2.5">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[15px]">{s.label || (s.subjectId ? subjects.get(s.subjectId)?.name : null) || 'Focus session'}</p>
-                          <p className="truncate text-xs text-muted">
-                            {relativeDayLabel(s.date, settings.dateFormat)} · {formatTime(isoToLocalTime(s.startedAt))}
-                            {s.plannedSec ? ` · planned ${formatDuration(s.plannedSec)}` : ' · open-ended'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[15px] font-medium tabular-nums">{formatDuration(s.durationSec, { seconds: true })}</p>
-                          {s.plannedSec ? <p className={cn('text-xs', s.completed ? 'text-success' : 'text-faint')}>{s.completed ? 'Completed' : 'Ended early'}</p> : null}
-                        </div>
+                      <li key={s.id}>
+                        <TimelineRow
+                          time={isoToLocalTime(s.startedAt)}
+                          icon={s.subjectId ? BookOpen : Timer}
+                          tone={RECORD_TONE.focus}
+                          title={s.label || (s.subjectId ? subjects.get(s.subjectId)?.name : null) || 'Focus session'}
+                          subtitle={`${relativeDayLabel(s.date, settings.dateFormat)}${s.plannedSec ? ` · planned ${formatDuration(s.plannedSec)}` : ' · open-ended'}`}
+                          trailing={
+                            <span className="shrink-0 text-right">
+                              <span className="block text-[13px] font-semibold tabular-nums">{formatDuration(s.durationSec, { seconds: true })}</span>
+                              {s.plannedSec ? <span className={cn('block text-[11px]', s.completed ? 'text-success' : 'text-faint')}>{s.completed ? 'Completed' : 'Ended early'}</span> : null}
+                            </span>
+                          }
+                        />
                       </li>
                     ))}
                   </ul>

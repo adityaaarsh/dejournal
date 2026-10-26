@@ -22,23 +22,25 @@ function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/95 backdrop-blur-md lg:hidden"
+      className="pb-safe fixed inset-x-0 bottom-0 z-40 rounded-t-[26px] border-t border-line bg-surface lg:hidden"
     >
-      <ul className="mx-auto flex max-w-2xl items-stretch justify-around px-2">
+      <ul className="mx-auto flex h-[72px] max-w-2xl items-center justify-around px-3">
         {PRIMARY_NAV.map(({ to, label, icon: Icon }) => {
           const active = isActive(pathname, to)
           return (
-            <li key={to} className="flex-1">
+            <li key={to} className={cn('flex justify-center', active ? 'flex-[1.6]' : 'flex-1')}>
               <NavLink
                 to={to}
                 aria-current={active ? 'page' : undefined}
+                aria-label={label}
+                title={label}
                 className={cn(
-                  'flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors',
-                  active ? 'text-accent' : 'text-muted hover:text-text',
+                  'flex h-11 items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-colors',
+                  active ? 'bg-accent px-4 text-on-accent' : 'w-11 text-muted hover:text-text',
                 )}
               >
-                <Icon size={22} strokeWidth={active ? 2.1 : 1.7} aria-hidden />
-                {label}
+                <Icon size={20} strokeWidth={active ? 2.1 : 1.9} aria-hidden />
+                {active && <span>{label}</span>}
               </NavLink>
             </li>
           )
@@ -57,7 +59,7 @@ function Sidebar() {
     )
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line px-3 py-5 lg:flex">
-      <div className="mb-6 px-3 text-xl font-bold tracking-tight">DeJournal</div>
+      <div className="mb-6 px-3 font-display text-lg font-semibold tracking-tight">DeJournal</div>
       <button
         type="button"
         onClick={() => openDialog({ kind: 'quick' })}
@@ -85,23 +87,6 @@ function Sidebar() {
         ))}
       </nav>
     </aside>
-  )
-}
-
-/** Floating quick-add button on mobile Today. */
-function QuickFab() {
-  const { pathname, search } = useLocation()
-  if (pathname !== '/') return null // Calendar has its own add buttons
-  const date = new URLSearchParams(search).get('d') ?? undefined
-  return (
-    <button
-      type="button"
-      aria-label="Quick add"
-      onClick={() => openDialog({ kind: 'quick', date })}
-      className="fixed right-4 bottom-[calc(80px+env(safe-area-inset-bottom))] z-30 grid h-14 w-14 place-items-center rounded-2xl bg-accent text-on-accent shadow-lg shadow-black/30 transition-transform hover:bg-accent-strong active:scale-95 lg:hidden"
-    >
-      <Plus size={26} strokeWidth={2} aria-hidden />
-    </button>
   )
 }
 
@@ -164,7 +149,6 @@ export function AppShell() {
           <Outlet />
         </Suspense>
       </main>
-      <QuickFab />
       <BottomNav />
       <DialogHost />
       <ReminderScheduler />

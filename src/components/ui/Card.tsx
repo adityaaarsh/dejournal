@@ -69,7 +69,7 @@ export function StatTile({
   const inner = (
     <>
       <div className="text-[13px] text-muted">{label}</div>
-      <div className="mt-1 text-xl font-semibold tracking-tight tabular-nums">{value}</div>
+      <div className="mt-1.5 font-display text-lg font-semibold tracking-tight tabular-nums">{value}</div>
       {sub && <div className="mt-0.5 text-xs text-faint">{sub}</div>}
       {children}
     </>

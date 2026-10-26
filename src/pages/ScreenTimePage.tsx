@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronLeft, ChevronRight, Info, Pencil, Plus, Smartphone, Trash } from 'lucide-react'
+import { CalendarCheck, Info, Pencil, Plus, Smartphone, Target, Trash, TrendingUp } from 'lucide-react'
 import { db } from '@/db/db'
 import type { ScreenTimeRecord } from '@/db/types'
 import { addDays, addMonthsKey, formatDate, isISODate, monthEnd, monthKey, monthStart, relativeDayLabel, today, weekRange } from '@/lib/dates'
@@ -10,7 +10,10 @@ import { describeChange, previousPeriod } from '@/domain/study'
 import { updateSettings, useSettings } from '@/stores/settings'
 import { toast, undoToast } from '@/stores/ui'
 import { ChartCard, ColumnChart } from '@/components/charts/Charts'
-import { Button, Card, EmptyState, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, Sheet, StatTile, Textarea } from '@/components/ui'
+import { Button, Card, EmptyState, Field, Input, MetricTile, NavSquare, Notice, Page, PageHeader, RECORD_TONE, SectionLabel, Segmented, Sheet, Textarea, TimelineRow } from '@/components/ui'
+import { CardHead, PeriodRow } from '@/features/study/PeriodRow'
+import { ScreenTimeDonut, ScreenTimeLegend, slicesFor } from '@/features/screentime/ScreenTimeDonut'
+import { cn } from '@/lib/text'
 import { isNativeApp } from '@/platform/native'
 import { PhoneUsageSync } from '@/features/screentime/PhoneUsageSync'
 
@@ -27,6 +30,8 @@ async function upsertScreenTime(date: string, minutes: number, note: string | un
       id: existing?.id ?? replacingId ?? uid(),
       date,
       minutes,
+      // Keep the phone's category split if only the note changed.
+      breakdown: existing && existing.minutes === minutes ? (existing.breakdown ?? null) : null,
       note,
       source: existing?.source ?? 'manual',
       createdAt: existing?.createdAt ?? now,
@@ -212,15 +217,22 @@ export default function ScreenTimePage() {
   const periodTitle =
     range === 'week' ? (offset === 0 ? 'This week' : `${formatDate(period.start, 'd MMM')} – ${formatDate(period.end, 'd MMM')}`) : formatDate(period.start, 'MMMM yyyy')
 
+  const todaySlices = slicesFor(todayRec)
+
   return (
     <Page>
       <PageHeader
         back="/more"
         title="Screen time"
-        subtitle={isNativeApp() ? 'Optional · from your phone or logged by hand' : 'Optional · logged manually'}
-        actions={<IconButton icon={Plus} label="Log screen time" onClick={() => setEditing('new')} />}
+        subtitle={isNativeApp() ? 'From your phone or logged by hand' : 'Logged by hand'}
+        actions={
+          <>
+            <NavSquare icon={Target} label="Daily goal" onClick={() => setGoalOpen(true)} />
+            <NavSquare icon={Plus} label="Log screen time" onClick={() => setEditing('new')} />
+          </>
+        }
       />
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         {isNativeApp() ? (
           <PhoneUsageSync />
         ) : (
@@ -230,59 +242,63 @@ export default function ScreenTimePage() {
           </Notice>
         )}
 
-        <Card className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[13px] text-muted">Today</div>
-              <div className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{todayRec ? formatDuration(todayRec.minutes * 60) : 'Not logged'}</div>
-              {goal > 0 && todayRec && (
-                <div className={`mt-0.5 text-xs ${todayRec.minutes <= goal ? 'text-success' : 'text-warn'}`}>
-                  {todayRec.minutes <= goal ? `${formatDuration((goal - todayRec.minutes) * 60)} under your goal` : `${formatDuration((todayRec.minutes - goal) * 60)} over your goal`}
-                </div>
+        <Card className="px-3 py-2">
+          <CardHead title="Today" onAdd={() => setEditing(todayRec ?? 'new')} addLabel={todayRec ? 'Edit' : 'Log'} />
+          <div className="flex items-center gap-4 py-2">
+            <ScreenTimeDonut slices={todaySlices} total={todayRec?.minutes ?? 0} />
+            <div className="min-w-0 flex-1">
+              {todayRec ? (
+                <ScreenTimeLegend slices={todaySlices} />
+              ) : (
+                <p className="text-[13px] text-muted">Nothing logged for today yet.</p>
               )}
+              {goal > 0 && todayRec && (
+                <p className={cn('mt-2.5 text-xs font-semibold', todayRec.minutes <= goal ? 'text-success' : 'text-warn')}>
+                  {todayRec.minutes <= goal ? `${formatDuration((goal - todayRec.minutes) * 60)} under your goal` : `${formatDuration((todayRec.minutes - goal) * 60)} over your goal`}
+                </p>
+              )}
+              <button type="button" onClick={() => setGoalOpen(true)} className="mt-2 inline-flex items-center gap-1 text-xs text-muted hover:text-text">
+                {goal > 0 ? `Daily goal: under ${formatDuration(goal * 60)}` : 'Set a daily goal'} <Pencil size={12} aria-hidden />
+              </button>
             </div>
-            <Button size="sm" variant={todayRec ? 'secondary' : 'subtle'} icon={todayRec ? Pencil : Plus} onClick={() => setEditing(todayRec ?? 'new')}>
-              {todayRec ? 'Edit' : 'Log today'}
-            </Button>
-          </div>
-          <div className="mt-3 border-t border-line pt-3">
-            <button type="button" onClick={() => setGoalOpen(true)} className="inline-flex items-center gap-1 text-xs text-muted hover:text-text">
-              {goal > 0 ? `Daily goal: under ${formatDuration(goal * 60)}` : 'Set a daily goal'} <Pencil size={12} aria-hidden />
-            </button>
           </div>
         </Card>
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
-            <IconButton icon={ChevronLeft} label={`Previous ${range}`} size="sm" onClick={() => setOffset((o) => o - 1)} />
-            <span className="min-w-28 text-center text-sm font-medium">{periodTitle}</span>
-            <IconButton icon={ChevronRight} label={`Next ${range}`} size="sm" onClick={() => setOffset((o) => o + 1)} disabled={offset >= 0} />
-          </div>
-          <Segmented
-            label="Period"
-            size="sm"
-            value={range}
-            onChange={(r) => {
-              setRange(r)
-              setOffset(0)
-            }}
-            options={[
-              { value: 'week', label: 'Week' },
-              { value: 'month', label: 'Month' },
-            ]}
-          />
-        </div>
+        <Segmented
+          label="Period"
+          className="w-full"
+          value={range}
+          onChange={(r) => {
+            setRange(r)
+            setOffset(0)
+          }}
+          options={[
+            { value: 'week', label: 'Week' },
+            { value: 'month', label: 'Month' },
+          ]}
+        />
+        <PeriodRow
+          title={periodTitle}
+          subtitle={`${inPeriod.length} ${inPeriod.length === 1 ? 'day' : 'days'} logged`}
+          onPrev={() => setOffset((o) => o - 1)}
+          onNext={() => setOffset((o) => o + 1)}
+          prevLabel={`Previous ${range}`}
+          nextLabel={`Next ${range}`}
+          nextDisabled={offset >= 0}
+        />
 
-        <div className="grid grid-cols-2 gap-3">
-          <StatTile
+        <div className="grid grid-cols-2 gap-2">
+          <MetricTile
+            icon={TrendingUp}
             label="Daily average"
             value={avgMin === null ? '—' : formatDuration(avgMin * 60)}
             sub={avgMin === null ? 'Nothing logged' : `${describeChange(avgMin, prevAvg, range === 'week' ? 'previous week' : 'previous month')}`}
           />
-          <StatTile
-            label={goal > 0 ? 'Days under goal' : 'Days logged'}
+          <MetricTile
+            icon={CalendarCheck}
+            label={goal > 0 ? 'Under goal' : 'Days logged'}
             value={goal > 0 ? `${underGoal}/${inPeriod.length}` : String(inPeriod.length)}
-            sub={goal > 0 ? 'of days logged' : `Average uses logged days only`}
+            sub={goal > 0 ? 'of days logged' : 'Average uses logged days only'}
           />
         </div>
 
@@ -301,10 +317,10 @@ export default function ScreenTimePage() {
           />
         </ChartCard>
 
-        <section aria-labelledby="st-history">
-          <h2 id="st-history" className="mb-2 text-[17px] font-semibold tracking-tight">
-            Logged days
-          </h2>
+        <section aria-labelledby="st-history" className="flex flex-col gap-2">
+          <SectionLabel>
+            <span id="st-history">Logged days</span>
+          </SectionLabel>
           {history.length === 0 ? (
             <EmptyState
               icon={Smartphone}
@@ -317,17 +333,21 @@ export default function ScreenTimePage() {
               }
             />
           ) : (
-            <Card className="px-2 py-1">
-              <ul className="divide-y divide-line">
+            <Card className="px-3 py-2">
+              <CardHead title="History" onAdd={() => setEditing('new')} />
+              <ul>
                 {history.map((r) => (
                   <li key={r.id}>
-                    <button type="button" onClick={() => setEditing(r)} className="flex min-h-14 w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-surface-2">
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[15px]">{relativeDayLabel(r.date, settings.dateFormat)}</span>
-                        {r.note && <span className="block truncate text-xs text-muted">{r.note}</span>}
-                      </span>
-                      <span className={`shrink-0 text-[15px] font-medium tabular-nums ${goal > 0 && r.minutes > goal ? 'text-warn' : ''}`}>{formatDuration(r.minutes * 60)}</span>
-                    </button>
+                    <TimelineRow
+                      icon={Smartphone}
+                      tone={RECORD_TONE.screentime}
+                      title={relativeDayLabel(r.date, settings.dateFormat)}
+                      subtitle={[r.source === 'import' ? 'From your phone' : 'Logged by hand', r.note].filter(Boolean).join(' · ')}
+                      trailing={
+                        <span className={cn('shrink-0 text-[13px] font-semibold tabular-nums', goal > 0 && r.minutes > goal && 'text-warn')}>{formatDuration(r.minutes * 60)}</span>
+                      }
+                      onClick={() => setEditing(r)}
+                    />
                   </li>
                 ))}
               </ul>

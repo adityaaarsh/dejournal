@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Pause, Play, Square, X } from 'lucide-react'
+import { BookOpen, Pause, Play, Square, Timer, X } from 'lucide-react'
 import { db } from '@/db/db'
 import { discardTimer, elapsedMs, finishStudyTimer, pauseTimer, resumeTimer, startTimer, useTimer } from '@/db/timers'
 import { formatClock, formatDuration } from '@/lib/duration'
 import { formatDate, isoToLocalDate, today } from '@/lib/dates'
-import { Button, Card, Field, Input } from '@/components/ui'
+import { Button, Card, Field, IconTile, Input, NavSquare } from '@/components/ui'
+import { cn } from '@/lib/text'
 import { confirmDialog, toast } from '@/stores/ui'
-import { SubjectDot, SubjectPicker } from './subjects'
+import { SubjectPicker, subjectTone } from './subjects'
 
 /** Minimum length for a timer session to be saved. */
 export const MIN_SESSION_SEC = 30
@@ -44,8 +45,17 @@ export function StudyTimer() {
 
   if (!timer) {
     return (
-      <Card className="p-5">
-        <h2 className="mb-3 text-[13px] font-medium text-muted">Study timer</h2>
+      <Card className="p-4">
+        <div className="mb-3 flex items-center gap-3">
+          <IconTile icon={Timer} tone={3} />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[14px] font-semibold">Study timer</h2>
+            <p className="text-xs text-muted">Keeps running if you close the app</p>
+          </div>
+          <span className="font-display text-[22px] font-semibold text-faint tabular-nums" aria-hidden>
+            00:00
+          </span>
+        </div>
         <form
           className="flex flex-col gap-3"
           onSubmit={(e) => {
@@ -64,7 +74,7 @@ export function StudyTimer() {
               {(p) => <Input {...p} value={topic} maxLength={120} placeholder="e.g. Binary trees" onChange={(e) => setTopic(e.target.value)} />}
             </Field>
           </div>
-          <Button type="submit" variant="primary" size="lg" icon={Play} loading={busy} block>
+          <Button type="submit" variant="primary" size="lg" icon={Play} loading={busy} block className="rounded-full!">
             Start studying
           </Button>
         </form>
@@ -75,41 +85,48 @@ export function StudyTimer() {
   const running = !!timer.runningSince
   const startedDay = isoToLocalDate(timer.startedAt)
   return (
-    <Card className="p-5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2 text-[13px] text-muted">
-          <span className={running ? 'h-2 w-2 animate-pulse rounded-full bg-success' : 'h-2 w-2 rounded-full bg-warn'} aria-hidden />
-          {running ? 'Studying' : 'Paused'}
-          {startedDay !== today() && <span className="text-faint">· started {formatDate(startedDay)}</span>}
+    <Card className="p-4">
+      <div className="flex items-center gap-3">
+        <IconTile icon={BookOpen} tone={subject ? subjectTone(subject) : 3} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-semibold">{subject?.name ?? 'No subject'}</p>
+          <p className="truncate text-xs text-muted">{timer.topic || (startedDay !== today() ? `Started ${formatDate(startedDay)}` : 'Study session')}</p>
         </div>
+        <span
+          className={cn(
+            'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
+            running ? 'bg-success-soft text-success' : 'bg-warn-soft text-warn',
+          )}
+        >
+          <span className={cn('h-1.5 w-1.5 rounded-full', running ? 'animate-pulse bg-success' : 'bg-warn')} aria-hidden />
+          {running ? 'Studying' : 'Paused'}
+        </span>
       </div>
-      <div className="mt-3 flex items-center gap-2 text-[15px]">
-        {subject && <SubjectDot color={subject.color} />}
-        <span className="truncate font-medium">{subject?.name ?? 'No subject'}</span>
-        {timer.topic && <span className="truncate text-muted">· {timer.topic}</span>}
-      </div>
-      <div className="my-4 text-center text-6xl font-semibold tracking-tight tabular-nums" role="timer" aria-live="off" aria-label={`Elapsed ${formatDuration(elapsed / 1000)}`}>
+      <div
+        className="my-5 text-center font-display text-[52px] leading-none font-semibold tracking-tight tabular-nums"
+        role="timer"
+        aria-live="off"
+        aria-label={`Elapsed ${formatDuration(elapsed / 1000)}`}
+      >
         {formatClock(elapsed)}
       </div>
-      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+      <div className="flex gap-2">
         {running ? (
-          <Button size="lg" icon={Pause} onClick={() => run(() => pauseTimer('study'))} disabled={busy}>
+          <Button size="lg" icon={Pause} onClick={() => run(() => pauseTimer('study'))} disabled={busy} className="flex-1 rounded-full!">
             Pause
           </Button>
         ) : (
-          <Button size="lg" variant="subtle" icon={Play} onClick={() => run(() => resumeTimer('study'))} disabled={busy}>
+          <Button size="lg" variant="subtle" icon={Play} onClick={() => run(() => resumeTimer('study'))} disabled={busy} className="flex-1 rounded-full!">
             Resume
           </Button>
         )}
-        <Button size="lg" variant="primary" icon={Square} onClick={() => run(endStudyTimer)} disabled={busy}>
+        <Button size="lg" variant="primary" icon={Square} onClick={() => run(endStudyTimer)} disabled={busy} className="flex-1 rounded-full!">
           End & save
         </Button>
-        <Button
-          size="lg"
-          variant="ghost"
+        <NavSquare
           icon={X}
-          aria-label="Discard session"
-          title="Discard session"
+          label="Discard session"
+          className="h-12 w-12 rounded-full!"
           onClick={() =>
             confirmDialog({
               title: 'Discard this session?',

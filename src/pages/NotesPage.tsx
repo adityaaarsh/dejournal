@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, NotebookPen, Pin, Plus, Search, X } from 'lucide-react'
-import { Button, Chip, IconButton, Input, Page, PageHeader, Segmented, EmptyState, LoadingState } from '@/components/ui'
+import type { ReactNode } from 'react'
+import { Button, Card, Chip, IconTile, Input, NavSquare, Page, PageHeader, RECORD_TONE, Segmented, EmptyState, LoadingState } from '@/components/ui'
 import { db } from '@/db/db'
 import type { Note } from '@/db/types'
 import { formatDate, isISODate, relativeDayLabel } from '@/lib/dates'
@@ -16,34 +17,40 @@ type Sort = 'updated' | 'created'
 
 function NoteCard({ note, query, dateFormat }: { note: Note; query: string; dateFormat: string }) {
   const text = stripMarkdown(note.content)
-  const preview = query ? snippet(text, query, 70) : text.replace(/\s+/g, ' ').slice(0, 140)
+  const preview = query ? snippet(text, query, 60) : text.replace(/\s+/g, ' ').slice(0, 120)
   return (
-    <li>
-      <Link
-        to={`/notes/${note.id}`}
-        className="block rounded-[var(--radius-card)] border border-line bg-surface p-4 transition-colors hover:bg-surface-2"
-      >
-        <div className="flex items-start gap-2">
-          <h3 className="min-w-0 flex-1 truncate text-[15px] font-medium">{note.title || <span className="text-muted">Untitled</span>}</h3>
-          {note.pinned && <Pin size={14} className="mt-1 shrink-0 text-accent" aria-label="Pinned" />}
-        </div>
-        {preview && <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-muted">{preview}</p>}
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-faint">
-          {note.date && (
+    <li className="border-t border-line first:border-t-0">
+      <Link to={`/notes/${note.id}`} className="flex min-h-[58px] items-center gap-3 rounded-xl py-2 transition-colors hover:bg-surface-2/60">
+        <IconTile icon={note.pinned ? Pin : NotebookPen} tone={note.pinned ? 'accent' : RECORD_TONE.note} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-semibold">{note.title || <span className="font-normal text-muted">Untitled</span>}</span>
+          <span className="block truncate text-xs text-muted">
+            {preview || (note.tags.length ? note.tags.map((t) => `#${t}`).join(' ') : 'Empty note')}
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1 text-[11px] text-faint">
+          {note.date ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-muted">
               <CalendarDays size={11} aria-hidden />
-              {relativeDayLabel(note.date, dateFormat)}
+              {relativeDayLabel(note.date, 'd MMM')}
             </span>
-          )}
-          {note.tags.slice(0, 4).map((t) => (
-            <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5">
-              #{t}
-            </span>
-          ))}
-          <span className="ml-auto">Edited {formatDistanceToNowStrict(new Date(note.updatedAt), { addSuffix: true })}</span>
-        </div>
+          ) : null}
+          <span>{formatDistanceToNowStrict(new Date(note.updatedAt), { addSuffix: true })}</span>
+        </span>
       </Link>
     </li>
+  )
+}
+
+function NoteGroup({ title, action, children }: { title: ReactNode; action?: ReactNode; children: ReactNode }) {
+  return (
+    <Card className="px-3 pt-1.5 pb-1">
+      <div className="flex h-9 items-center gap-2">
+        <h2 className="text-[13px] font-semibold">{title}</h2>
+        <span className="ml-auto">{action}</span>
+      </div>
+      <ul>{children}</ul>
+    </Card>
   )
 }
 
@@ -92,7 +99,7 @@ export default function NotesPage() {
 
   return (
     <Page>
-      <PageHeader title="Notes" back="/more" actions={<IconButton icon={Plus} label="New note" variant="primary" onClick={newNote} />}>
+      <PageHeader title="Notes" back="/more" subtitle="Ideas, lists and thoughts" actions={<NavSquare icon={Plus} label="New note" onClick={newNote} />}>
         <div className="mt-3 flex flex-col gap-2.5">
           <div className="relative">
             <Search size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" aria-hidden />
@@ -102,13 +109,13 @@ export default function NotesPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search notes"
               aria-label="Search notes"
-              className="pl-10"
+              className="h-10 pl-10"
             />
           </div>
           <div className="flex items-center gap-2">
             <Segmented
               label="Notes view"
-              size="sm"
+              className="flex-1"
               value={tab}
               onChange={setTab}
               options={[
@@ -121,7 +128,7 @@ export default function NotesPage() {
               aria-label="Sort notes"
               value={sort}
               onChange={(e) => setSort(e.target.value as Sort)}
-              className="ml-auto h-9 min-w-0 rounded-lg border border-line bg-surface-2 px-2 text-[13px] text-text focus:border-accent focus:outline-none"
+              className="h-11 min-w-0 shrink-0 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-text focus:border-accent focus:outline-none"
             >
               <option value="updated">Edited</option>
               <option value="created">Created</option>
@@ -168,44 +175,47 @@ export default function NotesPage() {
           />
         )
       ) : tab === 'dated' ? (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-3">
           {byDate.map(([date, list]) => (
-            <section key={date}>
-              <h2 className="mb-2 flex items-baseline justify-between px-1 text-[13px] font-medium text-muted">
-                {relativeDayLabel(date, 'EEEE, d MMM yyyy')}
-                <Link to={`/?d=${date}`} className="text-xs text-accent hover:underline">
+            <NoteGroup
+              key={date}
+              title={relativeDayLabel(date, 'EEEE, d MMM yyyy')}
+              action={
+                <Link to={`/?d=${date}`} className="text-[13px] font-semibold text-accent hover:underline">
                   Open day
                 </Link>
-              </h2>
-              <ul className="flex flex-col gap-2">
-                {list.map((n) => (
-                  <NoteCard key={n.id} note={n} query={query} dateFormat={settings.dateFormat} />
-                ))}
-              </ul>
-            </section>
+              }
+            >
+              {list.map((n) => (
+                <NoteCard key={n.id} note={n} query={query} dateFormat={settings.dateFormat} />
+              ))}
+            </NoteGroup>
           ))}
         </div>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-3">
           {pinned.length > 0 && (
-            <section aria-label="Pinned notes">
-              <h2 className="mb-2 px-1 text-xs font-semibold tracking-wider text-faint uppercase">Pinned</h2>
-              <ul className="flex flex-col gap-2">
-                {pinned.map((n) => (
-                  <NoteCard key={n.id} note={n} query={query} dateFormat={settings.dateFormat} />
-                ))}
-              </ul>
-            </section>
+            <NoteGroup title="Pinned">
+              {pinned.map((n) => (
+                <NoteCard key={n.id} note={n} query={query} dateFormat={settings.dateFormat} />
+              ))}
+            </NoteGroup>
           )}
           {rest.length > 0 && (
-            <section aria-label="Notes">
-              {pinned.length > 0 && <h2 className="mb-2 px-1 text-xs font-semibold tracking-wider text-faint uppercase">Others</h2>}
-              <ul className="flex flex-col gap-2">
-                {rest.map((n) => (
-                  <NoteCard key={n.id} note={n} query={query} dateFormat={settings.dateFormat} />
-                ))}
-              </ul>
-            </section>
+            <NoteGroup
+              title={tab === 'archived' ? 'Archived' : pinned.length ? 'Others' : 'Notes'}
+              action={
+                tab !== 'archived' && (
+                  <button type="button" onClick={newNote} className="text-[13px] font-semibold text-accent hover:underline">
+                    + New
+                  </button>
+                )
+              }
+            >
+              {rest.map((n) => (
+                <NoteCard key={n.id} note={n} query={query} dateFormat={settings.dateFormat} />
+              ))}
+            </NoteGroup>
           )}
         </div>
       )}

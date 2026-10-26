@@ -1,74 +1,115 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/dm-sans";
+@import "@fontsource-variable/unbounded";
 
 /* Theme variant driven by <html data-theme="..."> */
 @custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
 
 /*
- * Design tokens. Components use these via Tailwind utilities such as
+ * Design tokens: "Midnight Calm". Soft graphite surfaces, thin outlines and one
+ * mist-blue accent. Strong colour is reserved for meaning (spending level,
+ * mood, status). Components use these via Tailwind utilities such as
  * bg-surface, text-muted, border-line, text-accent.
  */
 :root,
 [data-theme="dark"] {
-  --c-bg: #0f1012;
-  --c-surface: #17181b;
-  --c-surface-2: #1f2125;
-  --c-surface-3: #282a2f;
-  --c-line: #2a2c31;
-  --c-line-strong: #3a3d44;
-  --c-text: #ececee;
-  --c-muted: #9a9ca3;
-  --c-faint: #6b6e76;
-  --c-accent: #5b9bff;
-  --c-accent-strong: #3d84f7;
-  --c-accent-soft: rgb(91 155 255 / 0.14);
-  --c-on-accent: #0b1220;
-  --c-warn: #f2b45a;
-  --c-warn-soft: rgb(242 180 90 / 0.12);
-  --c-warn-line: rgb(242 180 90 / 0.28);
-  --c-success: #4fc28b;
-  --c-success-soft: rgb(79 194 139 / 0.13);
-  --c-danger: #f07171;
-  --c-danger-soft: rgb(240 113 113 / 0.13);
-  --c-overlay: rgb(0 0 0 / 0.6);
+  --c-bg: #121418;
+  --c-surface: #1a1d22;
+  --c-surface-2: #22262d;
+  --c-surface-3: #2b3038;
+  --c-line: #2b2f37;
+  --c-line-strong: #3b4049;
+  --c-text: #eceae4;
+  --c-muted: #8e939c;
+  --c-faint: #5e636c;
+  --c-accent: #a9c3ee;
+  --c-accent-strong: #c0d3f3;
+  --c-accent-soft: rgb(169 195 238 / 0.14);
+  --c-on-accent: #121418;
+  --c-warn: #e4c47e;
+  --c-warn-soft: rgb(228 196 126 / 0.13);
+  --c-warn-line: rgb(228 196 126 / 0.32);
+  --c-success: #8ccba4;
+  --c-success-soft: rgb(140 203 164 / 0.13);
+  --c-danger: #e8918a;
+  --c-danger-soft: rgb(232 145 138 / 0.13);
+  --c-overlay: rgb(5 6 8 / 0.62);
+  /* Categorical (charts, screen-time categories): low saturation, distinct */
+  --c-cat-1: #a9c3ee;
+  --c-cat-2: #d8c3a1;
+  --c-cat-3: #9dc7b2;
+  --c-cat-4: #e3a9a3;
+  --c-cat-5: #6f7786;
+  /* Mood scale 1-5 (calendar cells, legends) and the text drawn on it */
+  --c-mood-1: #e07a84;
+  --c-mood-2: #e8a97e;
+  --c-mood-3: #e4c47e;
+  --c-mood-4: #a9c3ee;
+  --c-mood-5: #8ccba4;
+  --c-on-mood: #121418;
+  /* Icon tiles: soft solid fills with dark icons */
+  --c-tile-1: #a9c3ee;
+  --c-tile-2: #d8c3a1;
+  --c-tile-3: #9dc7b2;
+  --c-tile-4: #e3a9a3;
+  --c-tile-5: #8e95a3;
+  --c-on-tile: #121418;
   color-scheme: dark;
 }
 
 [data-theme="light"] {
-  --c-bg: #f6f6f4;
+  --c-bg: #f4f3ef;
   --c-surface: #ffffff;
-  --c-surface-2: #f0f0ee;
-  --c-surface-3: #e6e6e3;
-  --c-line: #e3e3df;
-  --c-line-strong: #cfcfca;
-  --c-text: #17181b;
-  --c-muted: #5f6168;
-  --c-faint: #8a8c93;
-  --c-accent: #2563eb;
-  --c-accent-strong: #1d4fd8;
-  --c-accent-soft: rgb(37 99 235 / 0.1);
+  --c-surface-2: #eeede8;
+  --c-surface-3: #e4e2dc;
+  --c-line: #e2e0da;
+  --c-line-strong: #cfccc4;
+  --c-text: #1b1d21;
+  --c-muted: #62666e;
+  --c-faint: #8f939a;
+  --c-accent: #4a6fae;
+  --c-accent-strong: #3c5e98;
+  --c-accent-soft: rgb(74 111 174 / 0.11);
   --c-on-accent: #ffffff;
-  --c-warn: #a16207;
-  --c-warn-soft: rgb(234 179 8 / 0.14);
-  --c-warn-line: rgb(161 98 7 / 0.25);
-  --c-success: #15803d;
-  --c-success-soft: rgb(21 128 61 / 0.1);
-  --c-danger: #c53030;
-  --c-danger-soft: rgb(197 48 48 / 0.09);
+  --c-warn: #a07612;
+  --c-warn-soft: rgb(196 150 40 / 0.13);
+  --c-warn-line: rgb(160 118 18 / 0.28);
+  --c-success: #2f8656;
+  --c-success-soft: rgb(47 134 86 / 0.1);
+  --c-danger: #be4a40;
+  --c-danger-soft: rgb(190 74 64 / 0.09);
   --c-overlay: rgb(20 20 20 / 0.35);
+  --c-cat-1: #4a6fae;
+  --c-cat-2: #a88452;
+  --c-cat-3: #4c8a6e;
+  --c-cat-4: #bb6a61;
+  --c-cat-5: #8a909b;
+  --c-mood-1: #f2b5ba;
+  --c-mood-2: #f5c9a6;
+  --c-mood-3: #f1db9e;
+  --c-mood-4: #bfd2f1;
+  --c-mood-5: #bfe3cc;
+  --c-on-mood: #1b1d21;
+  --c-tile-1: #c9d8f2;
+  --c-tile-2: #ead9bd;
+  --c-tile-3: #c4e0d2;
+  --c-tile-4: #f1cbc6;
+  --c-tile-5: #d5d8de;
+  --c-on-tile: #1b1d21;
   color-scheme: light;
 }
 
-/* Accent options (Settings → Appearance) */
-[data-accent="violet"] { --c-accent: #9b8cff; --c-accent-strong: #8574f7; --c-accent-soft: rgb(155 140 255 / 0.15); }
-[data-accent="teal"] { --c-accent: #3cc4b4; --c-accent-strong: #26ad9d; --c-accent-soft: rgb(60 196 180 / 0.14); }
-[data-accent="rose"] { --c-accent: #f27a9b; --c-accent-strong: #e35d82; --c-accent-soft: rgb(242 122 155 / 0.14); }
-[data-theme="light"][data-accent="violet"] { --c-accent: #6d4ee8; --c-accent-strong: #5b3bd6; }
-[data-theme="light"][data-accent="teal"] { --c-accent: #0f8a7c; --c-accent-strong: #0b776b; }
-[data-theme="light"][data-accent="rose"] { --c-accent: #d0386a; --c-accent-strong: #b82c5b; }
+/* Accent options (Settings → Appearance), all kept soft */
+[data-accent="violet"] { --c-accent: #b9b2ee; --c-accent-strong: #ccc6f3; --c-accent-soft: rgb(185 178 238 / 0.14); }
+[data-accent="teal"] { --c-accent: #9dc7b2; --c-accent-strong: #b3d5c4; --c-accent-soft: rgb(157 199 178 / 0.14); }
+[data-accent="rose"] { --c-accent: #e7aaa4; --c-accent-strong: #eebdb8; --c-accent-soft: rgb(231 170 164 / 0.14); }
+[data-theme="light"][data-accent="violet"] { --c-accent: #6a5fb8; --c-accent-strong: #5a50a3; --c-accent-soft: rgb(106 95 184 / 0.1); }
+[data-theme="light"][data-accent="teal"] { --c-accent: #3f7f62; --c-accent-strong: #336b52; --c-accent-soft: rgb(63 127 98 / 0.1); }
+[data-theme="light"][data-accent="rose"] { --c-accent: #b05a52; --c-accent-strong: #9a4b44; --c-accent-soft: rgb(176 90 82 / 0.1); }
 
 @theme inline {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Unbounded Variable", "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
   --color-bg: var(--c-bg);
   --color-surface: var(--c-surface);
   --color-surface-2: var(--c-surface-2);
@@ -90,7 +131,24 @@
   --color-danger: var(--c-danger);
   --color-danger-soft: var(--c-danger-soft);
   --color-overlay: var(--c-overlay);
-  --radius-card: 16px;
+  --color-cat-1: var(--c-cat-1);
+  --color-cat-2: var(--c-cat-2);
+  --color-cat-3: var(--c-cat-3);
+  --color-cat-4: var(--c-cat-4);
+  --color-cat-5: var(--c-cat-5);
+  --color-mood-1: var(--c-mood-1);
+  --color-mood-2: var(--c-mood-2);
+  --color-mood-3: var(--c-mood-3);
+  --color-mood-4: var(--c-mood-4);
+  --color-mood-5: var(--c-mood-5);
+  --color-on-mood: var(--c-on-mood);
+  --color-tile-1: var(--c-tile-1);
+  --color-tile-2: var(--c-tile-2);
+  --color-tile-3: var(--c-tile-3);
+  --color-tile-4: var(--c-tile-4);
+  --color-tile-5: var(--c-tile-5);
+  --color-on-tile: var(--c-on-tile);
+  --radius-card: 18px;
 }
 
 html,
@@ -100,7 +158,6 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  font-feature-settings: "cv11", "ss01";
 }
 
 body {
@@ -196,3 +253,8 @@ html[data-motion="reduced"] *::after {
 
 /* Leaflet container should respect theme surfaces */
 .leaflet-container { background: var(--c-surface-2); font-family: var(--font-sans); border-radius: 16px; }
+
+/* Timeline lists: hide the time column when no row in the group has a time */
+.dj-tl-group:not(:has(.dj-time:not([data-empty]))) .dj-time {
+  display: none;
+}

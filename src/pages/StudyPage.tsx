@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { BookOpen, ChevronLeft, ChevronRight, Pencil, Plus, Settings2, X } from 'lucide-react'
+import { BookOpen, CalendarCheck, Pencil, Plus, Settings2, X } from 'lucide-react'
 import { db } from '@/db/db'
 import { useTimer } from '@/db/timers'
-import type { StudySession } from '@/db/types'
+import type { StudySession, StudySubject } from '@/db/types'
 import {
   addDays,
   addMonthsKey,
@@ -21,18 +21,17 @@ import {
   weekRange,
 } from '@/lib/dates'
 import { formatDuration } from '@/lib/duration'
+import { plural } from '@/lib/text'
 import { consistency, describeChange, goalDaysMet, previousPeriod, secondsByDay, secondsBySubject, totalSeconds } from '@/domain/study'
 import { updateSettings, useSettings } from '@/stores/settings'
 import { openDialog } from '@/stores/ui'
-import {
-  BreakdownBars,
-  ChartCard,
-  ColumnChart,
-} from '@/components/charts/Charts'
-import { Button, Card, Chip, EmptyState, IconButton, Input, LoadingState, Page, PageHeader, ProgressBar, Segmented, StatTile } from '@/components/ui'
+import { ChartCard, ColumnChart } from '@/components/charts/Charts'
+import { Button, Card, Chip, EmptyState, IconButton, Input, LoadingState, MetricTile, NavSquare, Page, PageHeader, SectionLabel, Segmented, TimelineRow } from '@/components/ui'
+import { Ring } from '@/features/today/Cards'
 import { StudyTimer } from '@/features/study/StudyTimer'
 import { SubjectsSheet } from '@/features/study/SubjectsSheet'
-import { SubjectDot, subjectMap, useSubjects } from '@/features/study/subjects'
+import { CardHead, PeriodRow, StatStrip } from '@/features/study/PeriodRow'
+import { subjectMap, subjectTone, useSubjects } from '@/features/study/subjects'
 
 type Range = 'week' | 'month'
 
@@ -58,7 +57,7 @@ function GoalEditor({ label, minutes, onSave }: { label: string; minutes: number
     )
   return (
     <form
-      className="flex items-center gap-1.5"
+      className="flex flex-wrap items-center gap-1.5"
       onSubmit={(e) => {
         e.preventDefault()
         const total = (Number(h) || 0) * 60 + (Number(m) || 0)
@@ -66,9 +65,9 @@ function GoalEditor({ label, minutes, onSave }: { label: string; minutes: number
         setEditing(false)
       }}
     >
-      <Input aria-label={`${label} hours`} className="h-9 w-16 px-2 text-sm" type="number" min={0} value={h} onChange={(e) => setH(e.target.value)} autoFocus />
+      <Input aria-label={`${label} hours`} className="h-9 w-14 px-2 text-sm" type="number" min={0} value={h} onChange={(e) => setH(e.target.value)} autoFocus />
       <span className="text-xs text-muted">h</span>
-      <Input aria-label={`${label} minutes`} className="h-9 w-16 px-2 text-sm" type="number" min={0} max={59} value={m} onChange={(e) => setM(e.target.value)} />
+      <Input aria-label={`${label} minutes`} className="h-9 w-14 px-2 text-sm" type="number" min={0} max={59} value={m} onChange={(e) => setM(e.target.value)} />
       <span className="text-xs text-muted">m</span>
       <Button type="submit" size="sm" variant="primary">
         Save
@@ -78,26 +77,26 @@ function GoalEditor({ label, minutes, onSave }: { label: string; minutes: number
   )
 }
 
-function SessionRow({ s, subject }: { s: StudySession; subject?: { name: string; color: string } }) {
-  const title = s.topic || subject?.name || 'Study session'
+function SessionRow({ s, subject, showTime }: { s: StudySession; subject?: StudySubject; showTime: boolean }) {
+  const title = subject?.name ?? s.topic ?? 'Study session'
+  const sub = [
+    subject && s.topic ? s.topic : null,
+    s.startedAt && s.endedAt ? `${formatTime(isoToLocalTime(s.startedAt))} – ${formatTime(isoToLocalTime(s.endedAt))}` : null,
+    s.source === 'timer' ? 'Timer' : 'Logged',
+  ]
+    .filter(Boolean)
+    .join(' · ')
   return (
     <li>
-      <button
-        type="button"
+      <TimelineRow
+        time={showTime ? (s.startedAt ? isoToLocalTime(s.startedAt) : '—') : undefined}
+        icon={BookOpen}
+        tone={subject ? subjectTone(subject) : 3}
+        title={title}
+        subtitle={sub}
+        trailing={<span className="shrink-0 text-[13px] font-semibold tabular-nums">{formatDuration(s.durationSec)}</span>}
         onClick={() => openDialog({ kind: 'study', session: s })}
-        className="flex min-h-14 w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
-      >
-        <SubjectDot color={subject?.color} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px]">{title}</span>
-          <span className="block truncate text-xs text-muted">
-            {s.topic && subject ? `${subject.name} · ` : ''}
-            {s.startedAt && s.endedAt ? `${formatTime(isoToLocalTime(s.startedAt))} – ${formatTime(isoToLocalTime(s.endedAt))} · ` : ''}
-            {s.source === 'timer' ? 'Timer' : 'Logged'}
-          </span>
-        </span>
-        <span className="shrink-0 text-[15px] font-medium tabular-nums">{formatDuration(s.durationSec)}</span>
-      </button>
+      />
     </li>
   )
 }
@@ -186,89 +185,102 @@ export default function StudyPage() {
       <PageHeader
         back="/more"
         title="Study"
+        subtitle={`${formatDuration(weekSec)} this week · ${formatDuration(todaySec)} today`}
         actions={
           <>
-            <IconButton icon={Settings2} label="Manage subjects" onClick={() => setShowSubjects(true)} />
-            <IconButton icon={Plus} label="Log a study session" onClick={() => openDialog({ kind: 'study', date: filterDate ?? todayDate })} />
+            <NavSquare icon={Settings2} label="Manage subjects" onClick={() => setShowSubjects(true)} />
+            <NavSquare icon={Plus} label="Log a study session" onClick={() => openDialog({ kind: 'study', date: filterDate ?? todayDate })} />
           </>
         }
       />
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <StudyTimer />
 
-        <Card className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[13px] text-muted">Study time today</div>
-              <div className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
-                {formatDuration(todaySec)}
-                {runningToday >= 60 && <span className="ml-2 text-sm font-normal text-accent">+ {formatDuration(runningToday)} running</span>}
-              </div>
-              <div className="mt-0.5 text-xs text-faint">
-                {todayCount === 0 ? 'No sessions saved yet' : `${todayCount} ${todayCount === 1 ? 'session' : 'sessions'}`}
-                {goalSec > 0 && todaySec >= goalSec && <span className="text-success"> · Daily goal reached</span>}
-              </div>
-            </div>
-            <GoalEditor label="Daily goal" minutes={settings.studyGoalDailyMin} onSave={(m) => updateSettings({ studyGoalDailyMin: m })} />
-          </div>
-          {goalSec > 0 && (
-            <div className="mt-3">
-              <ProgressBar value={todaySec} max={goalSec} label="Progress toward daily study goal" tone={todaySec >= goalSec ? 'success' : 'accent'} />
-              <p className="mt-1.5 text-xs text-faint">
-                {todaySec >= goalSec ? `${formatDuration(todaySec - goalSec)} over your goal` : `${formatDuration(goalSec - todaySec)} to go`} · counts saved sessions only
-              </p>
-            </div>
-          )}
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
-            <div className="text-[13px]">
-              <span className="text-muted">This week </span>
-              <span className="font-medium tabular-nums">{formatDuration(weekSec)}</span>
-              {weeklyGoalSec > 0 && <span className="text-faint"> / {formatDuration(weeklyGoalSec)}</span>}
-            </div>
-            <GoalEditor label="Weekly goal" minutes={settings.studyGoalWeeklyMin} onSave={(m) => updateSettings({ studyGoalWeeklyMin: m })} />
-          </div>
-          {weeklyGoalSec > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          <MetricTile
+            icon={BookOpen}
+            label="Today"
+            className="relative"
+            value={formatDuration(todaySec)}
+            sub={
+              runningToday >= 60 ? (
+                <span className="text-accent">+ {formatDuration(runningToday)} running</span>
+              ) : todayCount === 0 ? (
+                'No sessions yet'
+              ) : goalSec > 0 && todaySec >= goalSec ? (
+                <span className="text-success">Goal reached</span>
+              ) : (
+                `${todayCount} ${todayCount === 1 ? 'session' : 'sessions'}`
+              )
+            }
+          >
+            {goalSec > 0 && <Ring value={todaySec} max={goalSec} className="absolute top-3 right-3" />}
             <div className="mt-2">
-              <ProgressBar value={weekSec} max={weeklyGoalSec} label="Progress toward weekly study goal" tone={weekSec >= weeklyGoalSec ? 'success' : 'accent'} />
+              <GoalEditor label="Daily goal" minutes={settings.studyGoalDailyMin} onSave={(m) => updateSettings({ studyGoalDailyMin: m })} />
             </div>
-          )}
-        </Card>
+          </MetricTile>
+          <MetricTile
+            icon={CalendarCheck}
+            label="This week"
+            className="relative"
+            value={formatDuration(weekSec)}
+            sub={
+              weeklyGoalSec > 0 ? (
+                weekSec >= weeklyGoalSec ? (
+                  <span className="text-success">Weekly goal reached</span>
+                ) : (
+                  `of ${formatDuration(weeklyGoalSec)}`
+                )
+              ) : (
+                'No weekly goal'
+              )
+            }
+          >
+            {weeklyGoalSec > 0 && <Ring value={weekSec} max={weeklyGoalSec} className="absolute top-3 right-3" />}
+            <div className="mt-2">
+              <GoalEditor label="Weekly goal" minutes={settings.studyGoalWeeklyMin} onSave={(m) => updateSettings({ studyGoalWeeklyMin: m })} />
+            </div>
+          </MetricTile>
+        </div>
 
-        {/* Analytics */}
+        {/* Insights */}
         <section aria-labelledby="study-analytics" className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="study-analytics" className="text-[17px] font-semibold tracking-tight">
-              Insights
-            </h2>
-            <Segmented
-              label="Period"
-              size="sm"
-              value={range}
-              onChange={(r) => {
-                setRange(r)
-                setOffset(0)
-              }}
-              options={[
-                { value: 'week', label: 'Week' },
-                { value: 'month', label: 'Month' },
-              ]}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <IconButton icon={ChevronLeft} label={`Previous ${range}`} size="sm" onClick={() => setOffset((o) => o - 1)} />
-            <span className="text-sm font-medium">{periodTitle}</span>
-            <IconButton icon={ChevronRight} label={`Next ${range}`} size="sm" onClick={() => setOffset((o) => o + 1)} disabled={offset >= 0} />
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <StatTile label="Total" value={formatDuration(periodSec)} sub={describeChange(periodSec, prevSec, period.end >= todayDate ? `the same days ${periodLabel}` : periodLabel)} />
-            <StatTile label="Consistency" value={cons.elapsed ? `${cons.studied}/${cons.elapsed}` : '—'} sub={cons.elapsed ? 'days studied so far' : 'Period not started'} />
-            <StatTile
-              label="Goal days"
-              value={settings.studyGoalDailyMin > 0 && cons.elapsed ? `${goalMet}/${cons.elapsed}` : '—'}
-              sub={settings.studyGoalDailyMin > 0 ? `days with ≥ ${formatDuration(goalSec)}` : 'No daily goal set'}
-              className="col-span-2 sm:col-span-1"
-            />
-          </div>
+          <SectionLabel>
+            <span id="study-analytics">Insights</span>
+          </SectionLabel>
+          <Segmented
+            label="Period"
+            className="w-full"
+            value={range}
+            onChange={(r) => {
+              setRange(r)
+              setOffset(0)
+            }}
+            options={[
+              { value: 'week', label: 'Week' },
+              { value: 'month', label: 'Month' },
+            ]}
+          />
+          <PeriodRow
+            title={periodTitle}
+            subtitle={describeChange(periodSec, prevSec, period.end >= todayDate ? `the same days ${periodLabel}` : periodLabel)}
+            onPrev={() => setOffset((o) => o - 1)}
+            onNext={() => setOffset((o) => o + 1)}
+            prevLabel={`Previous ${range}`}
+            nextLabel={`Next ${range}`}
+            nextDisabled={offset >= 0}
+          />
+          <StatStrip
+            items={[
+              { label: 'Total', value: formatDuration(periodSec), sub: plural(bySubject.reduce((n, b) => n + b.count, 0), 'session') },
+              { label: 'Days studied', value: cons.elapsed ? `${cons.studied}/${cons.elapsed}` : '—', sub: cons.elapsed ? 'so far' : 'not started' },
+              {
+                label: 'Goal days',
+                value: settings.studyGoalDailyMin > 0 && cons.elapsed ? `${goalMet}/${cons.elapsed}` : '—',
+                sub: settings.studyGoalDailyMin > 0 ? `≥ ${formatDuration(goalSec)}` : 'no goal',
+              },
+            ]}
+          />
           <ChartCard
             title="Minutes per day"
             subtitle={settings.studyGoalDailyMin > 0 ? `Line shows your daily goal (${formatDuration(goalSec)})` : undefined}
@@ -283,46 +295,51 @@ export default function StudyPage() {
               goal={settings.studyGoalDailyMin || undefined}
             />
           </ChartCard>
-          <Card className="p-4">
-            <h3 className="mb-3 text-[15px] font-medium">By subject</h3>
+          <Card className="px-3 py-2">
+            <CardHead title="By subject" meta={bySubject.length ? formatDuration(periodSec) : undefined} />
             {bySubject.length === 0 ? (
               <p className="py-4 text-center text-[13px] text-muted">No sessions in this period.</p>
             ) : (
-              <BreakdownBars
-                formatValue={(v) => formatDuration(v)}
-                items={bySubject.map((b) => {
+              <ul>
+                {bySubject.map((b) => {
                   const subj = subjectsById.get(b.subjectId)
-                  return {
-                    key: b.subjectId || 'none',
-                    label: subj?.name ?? 'No subject',
-                    value: b.seconds,
-                    icon: <SubjectDot color={subj?.color} />,
-                    sub: `${b.count} ${b.count === 1 ? 'session' : 'sessions'}`,
-                  }
+                  const pct = periodSec > 0 ? Math.round((b.seconds / periodSec) * 100) : 0
+                  return (
+                    <li key={b.subjectId || 'none'}>
+                      <TimelineRow
+                        icon={BookOpen}
+                        tone={subj ? subjectTone(subj) : 5}
+                        title={subj?.name ?? 'No subject'}
+                        subtitle={`${b.count} ${b.count === 1 ? 'session' : 'sessions'} · ${pct}%`}
+                        trailing={<span className="shrink-0 text-[13px] font-semibold tabular-nums">{formatDuration(b.seconds)}</span>}
+                      />
+                    </li>
+                  )
                 })}
-              />
+              </ul>
             )}
           </Card>
         </section>
 
         {/* History */}
-        <section aria-labelledby="study-history">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 id="study-history" className="text-[17px] font-semibold tracking-tight">
-              Sessions
-            </h2>
-            {filterDate && (
-              <Chip
-                active
-                onClick={() => {
-                  params.delete('d')
-                  setParams(params, { replace: true })
-                }}
-              >
-                {formatDate(filterDate)} <X size={12} aria-label="Clear date filter" />
-              </Chip>
-            )}
-          </div>
+        <section aria-labelledby="study-history" className="flex flex-col gap-2">
+          <SectionLabel
+            action={
+              filterDate ? (
+                <Chip
+                  active
+                  onClick={() => {
+                    params.delete('d')
+                    setParams(params, { replace: true })
+                  }}
+                >
+                  {formatDate(filterDate)} <X size={12} aria-label="Clear date filter" />
+                </Chip>
+              ) : undefined
+            }
+          >
+            <span id="study-history">Sessions</span>
+          </SectionLabel>
           {groups.length === 0 ? (
             <EmptyState
               icon={BookOpen}
@@ -335,16 +352,17 @@ export default function StudyPage() {
               }
             />
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
               {groups.map((g) => (
-                <Card key={g.date} className="px-2 py-2">
-                  <div className="flex items-center justify-between px-2 pt-1 pb-1 text-[13px]">
-                    <span className="font-medium text-muted">{relativeDayLabel(g.date, settings.dateFormat)}</span>
-                    <span className="text-faint tabular-nums">{formatDuration(g.items.reduce((s, x) => s + x.durationSec, 0))}</span>
-                  </div>
+                <Card key={g.date} className="px-3 py-2">
+                  <CardHead
+                    title={relativeDayLabel(g.date, settings.dateFormat)}
+                    meta={formatDuration(g.items.reduce((s, x) => s + x.durationSec, 0))}
+                    onAdd={() => openDialog({ kind: 'study', date: g.date })}
+                  />
                   <ul>
                     {g.items.map((s) => (
-                      <SessionRow key={s.id} s={s} subject={s.subjectId ? subjectsById.get(s.subjectId) : undefined} />
+                      <SessionRow key={s.id} s={s} showTime={g.items.some((x) => !!x.startedAt)} subject={s.subjectId ? subjectsById.get(s.subjectId) : undefined} />
                     ))}
                   </ul>
                 </Card>

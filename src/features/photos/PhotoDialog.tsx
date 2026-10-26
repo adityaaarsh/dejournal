@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Camera, Images, MapPin, RefreshCw, SwitchCamera, Upload, X } from 'lucide-react'
-import { Button, Field, Input, Notice, Sheet, TagInput, Toggle } from '@/components/ui'
+import { Button, Field, Input, Notice, Sheet, TagInput, Toggle, IconTile } from '@/components/ui'
 import type { DialogProps } from '@/features/quick/DialogHost'
 import { db } from '@/db/db'
 import { savePhoto, useObjectUrl, usePhotoUrl } from '@/db/photos'
@@ -230,17 +230,17 @@ export default function PhotoDialog({ request, onClose }: DialogProps<'photo'>) 
             <button
               type="button"
               onClick={() => (cameraSupported() ? startCamera() : captureRef.current?.click())}
-              className="flex h-28 flex-col items-center justify-center gap-2 rounded-2xl border border-line bg-surface-2 text-sm font-medium hover:bg-surface-3"
+              className="flex h-28 flex-col items-center justify-center gap-2.5 rounded-2xl border border-line bg-surface text-[13px] font-semibold hover:bg-surface-2"
             >
-              <Camera size={24} className="text-accent" aria-hidden />
+              <IconTile icon={Camera} tone="accent" size="lg" />
               Take photo
             </button>
             <button
               type="button"
               onClick={() => uploadRef.current?.click()}
-              className="flex h-28 flex-col items-center justify-center gap-2 rounded-2xl border border-line bg-surface-2 text-sm font-medium hover:bg-surface-3"
+              className="flex h-28 flex-col items-center justify-center gap-2.5 rounded-2xl border border-line bg-surface text-[13px] font-semibold hover:bg-surface-2"
             >
-              <Upload size={24} className="text-accent" aria-hidden />
+              <IconTile icon={Upload} tone={4} size="lg" />
               Upload
             </button>
           </div>

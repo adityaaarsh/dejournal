@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BellOff, BellRing, Info } from 'lucide-react'
-import { Button, Card, Notice, Toggle } from '@/components/ui'
+import { Button, Card, IconTile, Notice, RECORD_TONE, Toggle } from '@/components/ui'
 import { updateSettings, useSettings } from '@/stores/settings'
 import { toast } from '@/stores/ui'
 import { permissionState, requestNotificationPermission, type PermissionState } from './notifications'
@@ -56,13 +56,11 @@ export function NotificationStatusPanel() {
   const settings = useSettings()
   const [perm, request] = usePermission()
   return (
-    <Card className="p-4">
+    <Card className="p-3">
       <div className="flex items-start gap-3">
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${perm === 'granted' && settings.notificationsEnabled ? 'bg-accent-soft text-accent' : 'bg-surface-2 text-muted'}`}>
-          {perm === 'granted' && settings.notificationsEnabled ? <BellRing size={18} aria-hidden /> : <BellOff size={18} aria-hidden />}
-        </span>
+        <IconTile icon={perm === 'granted' && settings.notificationsEnabled ? BellRing : BellOff} tone={perm === 'granted' && settings.notificationsEnabled ? RECORD_TONE.reminder : 'muted'} />
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-medium">Notifications</p>
+          <p className="text-[14px] font-semibold">Notifications</p>
           <p className="text-[13px] text-muted">
             {isNativeApp() ? 'Permission' : 'Browser permission'}: <span className="text-text">{LABEL[perm]}</span>
           </p>

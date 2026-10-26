@@ -44,8 +44,27 @@ export async function updateSubject(id: string, patch: Partial<StudySubject>): P
   await db.studySubjects.update(id, patch)
 }
 
+/** Theme tile tone (1–5) for a subject, derived from its stored colour slot. */
+export type SubjectTone = 1 | 2 | 3 | 4 | 5
+const TONE_BG: Record<SubjectTone, string> = { 1: 'bg-tile-1', 2: 'bg-tile-2', 3: 'bg-tile-3', 4: 'bg-tile-4', 5: 'bg-tile-5' }
+
+export function subjectTone(subject?: Pick<StudySubject, 'color' | 'id'> | { color?: string; id?: string } | null): SubjectTone {
+  if (!subject) return 3
+  const i = subject.color ? SUBJECT_COLORS.indexOf(subject.color) : -1
+  if (i >= 0) return ((i % 5) + 1) as SubjectTone
+  let h = 0
+  for (const ch of subject.id ?? subject.color ?? '') h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return ((h % 5) + 1) as SubjectTone
+}
+
+/** Stored colour that maps to a tone (keeps the existing storage format). */
+export function colorForTone(tone: SubjectTone): string {
+  return SUBJECT_COLORS[tone - 1]
+}
+
 export function SubjectDot({ color, className = '' }: { color?: string; className?: string }) {
-  return <span aria-hidden className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${className}`} style={{ background: color ?? 'var(--c-faint)' }} />
+  const bg = color ? TONE_BG[subjectTone({ color })] : 'bg-faint'
+  return <span aria-hidden className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${bg} ${className}`} />
 }
 
 /**

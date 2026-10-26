@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Archive, ArchiveRestore, Plus } from 'lucide-react'
 import type { StudySubject } from '@/db/types'
-import { SUBJECT_COLORS } from '@/domain/study'
 import { Button, EmptyState, IconButton, Input, Sheet } from '@/components/ui'
 import { toast } from '@/stores/ui'
 import { cn } from '@/lib/text'
-import { createSubject, updateSubject, useSubjects } from './subjects'
+import { colorForTone, createSubject, subjectTone, updateSubject, useSubjects, type SubjectTone } from './subjects'
+
+const TILE: Record<SubjectTone, string> = { 1: 'bg-tile-1', 2: 'bg-tile-2', 3: 'bg-tile-3', 4: 'bg-tile-4', 5: 'bg-tile-5' }
 
 function SubjectRow({ subject }: { subject: StudySubject }) {
   const [name, setName] = useState(subject.name)
@@ -28,7 +29,7 @@ function SubjectRow({ subject }: { subject: StudySubject }) {
           onClick={() => setPicking((p) => !p)}
           className="grid h-11 w-11 shrink-0 place-items-center rounded-xl hover:bg-surface-2"
         >
-          <span className="h-4 w-4 rounded-full" style={{ background: subject.color }} />
+          <span className={cn('h-5 w-5 rounded-md', TILE[subjectTone(subject)])} />
         </button>
         <Input
           aria-label={`Name for subject ${subject.name}`}
@@ -49,19 +50,18 @@ function SubjectRow({ subject }: { subject: StudySubject }) {
       </div>
       {picking && (
         <div role="radiogroup" aria-label="Subject colour" className="mt-2 ml-13 flex flex-wrap gap-2">
-          {SUBJECT_COLORS.map((c) => (
+          {([1, 2, 3, 4, 5] as SubjectTone[]).map((t) => (
             <button
-              key={c}
+              key={t}
               type="button"
               role="radio"
-              aria-checked={subject.color === c}
-              aria-label={`Colour ${c}`}
+              aria-checked={subjectTone(subject) === t}
+              aria-label={`Colour ${t}`}
               onClick={async () => {
-                await updateSubject(subject.id, { color: c })
+                await updateSubject(subject.id, { color: colorForTone(t) })
                 setPicking(false)
               }}
-              className={cn('h-8 w-8 rounded-full border-2', subject.color === c ? 'border-text' : 'border-transparent')}
-              style={{ background: c }}
+              className={cn('h-9 w-9 rounded-xl ring-offset-2 ring-offset-surface', TILE[t], subjectTone(subject) === t && 'ring-2 ring-text')}
             />
           ))}
         </div>

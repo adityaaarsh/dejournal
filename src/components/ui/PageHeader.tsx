@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
-import { IconButton } from './Button'
+import { ChevronLeft } from 'lucide-react'
+import { NavSquare } from './Calm'
 import { cn } from '@/lib/text'
 
 /**
@@ -25,13 +25,12 @@ export function PageHeader({
 }) {
   const navigate = useNavigate()
   return (
-    <header className={cn('sticky top-0 z-20 -mx-4 bg-bg/90 px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 backdrop-blur-md sm:-mx-6 sm:px-6', className)}>
-      <div className="flex min-h-11 items-center gap-2">
+    <header className={cn('sticky top-0 z-20 -mx-4 bg-bg px-4 pt-[max(env(safe-area-inset-top),10px)] pb-3 sm:-mx-6 sm:px-6', className)}>
+      <div className="flex min-h-11 items-center gap-3">
         {back && (
-          <IconButton
-            icon={ArrowLeft}
+          <NavSquare
+            icon={ChevronLeft}
             label="Back"
-            className="-ml-2.5"
             onClick={() => {
               if (typeof back === 'string') navigate(back)
               else if (window.history.length > 1) navigate(-1)
@@ -40,8 +39,8 @@ export function PageHeader({
           />
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[22px] font-semibold tracking-tight">{title}</h1>
-          {subtitle && <p className="truncate text-[13px] text-muted">{subtitle}</p>}
+          <h1 className="truncate font-display text-[19px] leading-tight font-semibold tracking-tight">{title}</h1>
+          {subtitle && <p className="mt-0.5 truncate text-xs text-muted">{subtitle}</p>}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
       </div>

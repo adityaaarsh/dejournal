@@ -12,7 +12,7 @@
         android:translateY="9.2">
         <path
             android:pathData="M20,16h12c9.4,0 16,6.6 16,16s-6.6,16 -16,16H20z"
-            android:strokeColor="#5B9BFF"
+            android:strokeColor="#A9C3EE"
             android:strokeWidth="5"
             android:strokeLineJoin="round"
             android:fillColor="#00000000" />

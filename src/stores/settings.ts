@@ -16,6 +16,7 @@ export type DashboardSectionId =
   | 'routines'
   | 'study'
   | 'expenses'
+  | 'screentime'
   | 'activity'
 
 export type QuickActionId =
@@ -60,6 +61,8 @@ export interface Settings {
   recentSearchesEnabled: boolean
   recommendationsEnabled: boolean
   dashboard: DashboardSection[]
+  /** Bumped when the default Today layout changes, so existing installs get it. */
+  dashboardVersion: number
   quickActions: QuickActionId[]
   ratingLabels: [string, string, string, string, string]
 }
@@ -85,17 +88,21 @@ export const DEFAULT_SETTINGS: Settings = {
   mapTilesEnabled: true,
   recentSearchesEnabled: true,
   recommendationsEnabled: true,
+  // Default Today fits on one phone screen without scrolling; the extra
+  // sections can be switched on in Settings → Dashboard.
   dashboard: [
     { id: 'recommendation', visible: true },
     { id: 'rating', visible: true },
-    { id: 'highlight', visible: true },
-    { id: 'tasks', visible: true },
-    { id: 'agenda', visible: true },
-    { id: 'routines', visible: true },
     { id: 'study', visible: true },
     { id: 'expenses', visible: true },
-    { id: 'activity', visible: true },
+    { id: 'screentime', visible: true },
+    { id: 'highlight', visible: true },
+    { id: 'tasks', visible: true },
+    { id: 'agenda', visible: false },
+    { id: 'routines', visible: false },
+    { id: 'activity', visible: false },
   ],
+  dashboardVersion: 2,
   quickActions: ['task', 'expense', 'study', 'note', 'photo', 'highlight', 'reminder', 'rating', 'event'],
   ratingLabels: ['Very difficult', 'Below average', 'Average', 'Good', 'Excellent'],
 }
@@ -105,6 +112,11 @@ const KEY = 'settings'
 /** Merge stored settings with defaults so new fields always have values. */
 export function mergeSettings(stored: Partial<Settings> | undefined): Settings {
   const s = { ...DEFAULT_SETTINGS, ...(stored ?? {}) }
+  // Older layouts are replaced by the current default once.
+  if ((stored?.dashboardVersion ?? 1) < DEFAULT_SETTINGS.dashboardVersion) {
+    s.dashboard = DEFAULT_SETTINGS.dashboard
+    s.dashboardVersion = DEFAULT_SETTINGS.dashboardVersion
+  }
   // Keep dashboard list complete if new sections were added in an update.
   const known = new Set(s.dashboard.map((d) => d.id))
   const dashboard = [...s.dashboard.filter((d) => DEFAULT_SETTINGS.dashboard.some((x) => x.id === d.id))]
@@ -142,7 +154,7 @@ export function applyAppearance(s: Pick<Settings, 'theme' | 'accent' | 'motion'>
   if (s.motion === 'system') delete root.dataset.motion
   else root.dataset.motion = s.motion
   const meta = document.querySelector('meta[name="theme-color"]')
-  meta?.setAttribute('content', resolved === 'light' ? '#f6f6f4' : '#0f1012')
+  meta?.setAttribute('content', resolved === 'light' ? '#f4f3ef' : '#121418')
   setNativeSystemBars(resolved)
   try {
     localStorage.setItem('dj-theme', s.theme)

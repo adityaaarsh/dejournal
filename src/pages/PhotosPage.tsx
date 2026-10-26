@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Images, LayoutGrid, Lock, Plus, Rows3, Search, UserRound, X } from 'lucide-react'
-import { Button, Chip, IconButton, Input, Page, PageHeader, Segmented, EmptyState, LoadingState } from '@/components/ui'
+import { Button, Card, Chip, Input, NavSquare, Page, PageHeader, Segmented, EmptyState, LoadingState } from '@/components/ui'
 import { db } from '@/db/db'
 import { useObjectUrl } from '@/db/photos'
 import type { Photo } from '@/db/types'
@@ -21,13 +21,13 @@ function Thumb({ photo, onOpen }: { photo: Photo; onOpen: () => void }) {
       type="button"
       onClick={onOpen}
       aria-label={`${photo.caption || 'Photo'}, ${formatDate(photo.date, 'd MMM yyyy')}`}
-      className="group relative aspect-square overflow-hidden rounded-xl bg-surface-2 focus-visible:outline-offset-1"
+      className="group relative aspect-square overflow-hidden rounded-xl border border-line bg-surface-2 focus-visible:outline-offset-1"
     >
       {url && (
         <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
       )}
       {photo.isSelfie && (
-        <span className="absolute top-1.5 left-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/55 text-white" title="Selfie">
+        <span className="absolute top-1.5 left-1.5 grid h-6 w-6 place-items-center rounded-lg bg-accent text-on-accent" title="Selfie">
           <UserRound size={13} aria-hidden />
         </span>
       )}
@@ -94,7 +94,8 @@ export default function PhotosPage() {
       <PageHeader
         title="Photos"
         back="/more"
-        actions={<IconButton icon={Plus} label="Add photo" variant="primary" onClick={() => openDialog({ kind: 'photo', date: dayFilter ?? undefined })} />}
+        subtitle={result ? `${result.total} photo${result.total === 1 ? "" : "s"}` : undefined}
+        actions={<NavSquare icon={Plus} label="Add photo" onClick={() => openDialog({ kind: 'photo', date: dayFilter ?? undefined })} />}
       >
         <div className="mt-3 flex flex-col gap-2.5">
           <div className="relative">
@@ -108,20 +109,20 @@ export default function PhotosPage() {
               }}
               placeholder="Search captions and tags"
               aria-label="Search photos"
-              className="pl-10"
+              className="h-10 pl-10"
             />
           </div>
+          <Segmented
+            label="Layout"
+            className="w-full"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'grid', label: 'Grid', icon: <LayoutGrid size={14} aria-hidden /> },
+              { value: 'timeline', label: 'Timeline', icon: <Rows3 size={14} aria-hidden /> },
+            ]}
+          />
           <div className="flex flex-wrap items-center gap-2">
-            <Segmented
-              label="Layout"
-              size="sm"
-              value={view}
-              onChange={setView}
-              options={[
-                { value: 'grid', label: 'Grid', icon: <LayoutGrid size={14} aria-hidden /> },
-                { value: 'timeline', label: 'Timeline', icon: <Rows3 size={14} aria-hidden /> },
-              ]}
-            />
             <Chip active={!selfiesOnly} onClick={() => setSelfiesOnly(false)}>
               All
             </Chip>
@@ -129,8 +130,8 @@ export default function PhotosPage() {
               Selfies
             </Chip>
             {!dayFilter && (
-              <label className="flex items-center gap-1.5 text-xs text-muted">
-                <span>Month</span>
+              <label className="ml-auto flex items-center gap-1 text-xs text-muted">
+                <span className="sr-only">Month</span>
                 <input
                   type="month"
                   value={month}
@@ -138,10 +139,10 @@ export default function PhotosPage() {
                     setMonth(e.target.value)
                     setLimit(PAGE_SIZE)
                   }}
-                  className="h-8 w-[9.5rem] rounded-lg border border-line bg-surface-2 px-2 text-[13px] text-text"
+                  className="h-8 w-[9.5rem] rounded-full border border-line bg-surface px-3 text-[13px] text-text"
                 />
                 {month && (
-                  <button type="button" aria-label="Clear month filter" onClick={() => setMonth('')} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-surface-2 hover:text-text">
+                  <button type="button" aria-label="Clear month filter" onClick={() => setMonth('')} className="grid h-8 w-8 place-items-center rounded-full hover:bg-surface-2 hover:text-text">
                     <X size={14} />
                   </button>
                 )}
@@ -181,21 +182,24 @@ export default function PhotosPage() {
           ))}
         </div>
       ) : (
-        <div className="mt-1 flex flex-col gap-6">
+        <div className="mt-1 flex flex-col gap-3">
           {groups.map(([date, photos]) => (
-            <section key={date} aria-label={formatDate(date, 'EEEE, d MMMM yyyy')}>
-              <h2 className="mb-2 flex items-baseline justify-between text-[13px] font-medium">
-                <span>{relativeDayLabel(date, 'EEEE, d MMM yyyy')}</span>
-                <Link to={`/?d=${date}`} className="text-xs text-accent hover:underline">
-                  Open day
-                </Link>
-              </h2>
-              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
-                {photos.map((p) => (
-                  <Thumb key={p.id} photo={p} onOpen={() => setOpen(p.id)} />
-                ))}
-              </div>
-            </section>
+            <Card key={date} className="p-3">
+              <section aria-label={formatDate(date, 'EEEE, d MMMM yyyy')}>
+                <h2 className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold">
+                  <span>{relativeDayLabel(date, 'EEEE, d MMM yyyy')}</span>
+                  <span className="text-xs font-normal text-faint">{photos.length}</span>
+                  <Link to={`/?d=${date}`} className="ml-auto text-[13px] font-semibold text-accent hover:underline">
+                    Open day
+                  </Link>
+                </h2>
+                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                  {photos.map((p) => (
+                    <Thumb key={p.id} photo={p} onOpen={() => setOpen(p.id)} />
+                  ))}
+                </div>
+              </section>
+            </Card>
           ))}
         </div>
       )}
@@ -209,8 +213,8 @@ export default function PhotosPage() {
       )}
 
       {items.length > 0 && (
-        <p className="mt-6 flex items-center justify-center gap-1.5 text-xs text-faint">
-          <Lock size={12} aria-hidden /> Photos are stored only on this device.
+        <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-faint">
+          <Lock size={12} aria-hidden /> Private: photos never leave this device.
         </p>
       )}
 

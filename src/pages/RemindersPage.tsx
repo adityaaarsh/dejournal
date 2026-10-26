@@ -5,8 +5,8 @@ import { AlarmClock, Ban, Bell, BellOff, Check, Link2, Pencil, Plus, Repeat, Tra
 import { db } from '@/db/db'
 import type { ISODate, Reminder } from '@/db/types'
 import { deleteReminder, occurrenceState, reminderOccursOn, remindersOn, setOccurrenceState, snoozeReminder } from '@/db/reminders'
-import { Button, Card, EmptyState, LoadingState, Page, PageHeader } from '@/components/ui'
-import { addDays, formatTime, relativeDayLabel, today } from '@/lib/dates'
+import { Button, EmptyState, IconTile, LoadingState, NavSquare, Page, PageHeader, RECORD_TONE } from '@/components/ui'
+import { addDays, formatDate, formatTime, relativeDayLabel, today } from '@/lib/dates'
 import { describeRecurrence } from '@/lib/recurrence'
 import { cn } from '@/lib/text'
 import { openDialog, toast } from '@/stores/ui'
@@ -26,19 +26,21 @@ function nextOccurrence(r: Reminder, from: ISODate): ISODate | null {
   return null
 }
 
-function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+/** Timeline card: title + count on the left, optional action on the right. */
+function Section({ title, count, action, children }: { title: string; count?: number; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="flex items-center gap-2 px-1 text-xs font-semibold tracking-wider text-faint uppercase">
-        {title}
-        {count !== undefined && <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted tabular-nums">{count}</span>}
-      </h2>
-      <Card className="divide-y divide-line px-3">{children}</Card>
+    <section aria-label={title} className="rounded-[var(--radius-card)] border border-line bg-surface px-3 pt-2.5 pb-1.5">
+      <div className="flex items-center gap-2 pb-1">
+        <h2 className="text-[14px] font-semibold">{title}</h2>
+        {count !== undefined && <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-muted tabular-nums">{count}</span>}
+        <span className="ml-auto">{action}</span>
+      </div>
+      <div className="flex flex-col">{children}</div>
     </section>
   )
 }
 
-function ReminderRow({ r, date, meta, taskTitle }: { r: Reminder; date: ISODate | null; meta?: ReactNode; taskTitle?: string }) {
+function ReminderRow({ r, date, meta, taskTitle, when }: { r: Reminder; date: ISODate | null; meta?: ReactNode; taskTitle?: string; when?: string }) {
   const state = date ? occurrenceState(r, date) : r.status
   const done = state === 'done'
   const missed = !r.recurrence && state === 'pending' && date !== null && date < today()
@@ -77,39 +79,19 @@ function ReminderRow({ r, date, meta, taskTitle }: { r: Reminder; date: ISODate 
     { label: 'Delete', icon: Trash2, destructive: true, onSelect: () => deleteReminder(r.id) },
   ]
 
+  const inactive = done || state === 'dismissed'
   return (
-    <div className="flex min-h-14 items-center gap-1 py-1">
-      {!date ? (
-        <span className="-ml-1 grid h-11 w-11 shrink-0 place-items-center text-muted" aria-hidden>
-          <Repeat size={17} />
-        </span>
-      ) : (
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={done}
-        aria-label={`Mark "${r.title}" ${done ? 'not done' : 'done'}`}
-        onClick={toggle}
-        className="-ml-1 grid h-11 w-11 shrink-0 place-items-center"
-      >
-        <span
-          className={cn(
-            'grid h-[22px] w-[22px] place-items-center rounded-full border transition-colors',
-            done ? 'border-success bg-success text-bg' : state === 'dismissed' ? 'border-line' : 'border-line-strong hover:border-accent',
-          )}
-        >
-          {done && <Check size={13} strokeWidth={3} />}
-        </span>
-      </button>
-      )}
+    <div className="flex min-h-[54px] items-center gap-3 py-1">
+      <span className="w-12 shrink-0 text-xs font-semibold text-muted tabular-nums">{when ?? r.time.slice(0, 5)}</span>
+      <IconTile icon={date ? Bell : Repeat} tone={inactive ? 'muted' : RECORD_TONE.reminder} />
       <button
         type="button"
         onClick={() => openDialog({ kind: 'reminder', reminder: r, date: date ?? undefined })}
-        className="min-w-0 flex-1 py-1.5 text-left"
+        className="min-w-0 flex-1 py-1 text-left"
       >
-        <span className={cn('block truncate text-[15px]', (done || state === 'dismissed') && 'text-muted line-through')}>{r.title}</span>
+        <span className={cn('block truncate text-[14px] font-semibold', inactive && 'text-faint line-through')}>{r.title}</span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
-          <span className="tabular-nums">{formatTime(r.time)}</span>
+          {when && <span className="tabular-nums">{formatTime(r.time)}</span>}
           {meta}
           {r.recurrence && (
             <span className="inline-flex items-center gap-1">
@@ -126,12 +108,31 @@ function ReminderRow({ r, date, meta, taskTitle }: { r: Reminder; date: ISODate 
             </span>
           )}
           {taskTitle && (
-            <span className="inline-flex max-w-48 items-center gap-1 truncate">
+            <span className="inline-flex max-w-40 items-center gap-1 truncate">
               <Link2 size={11} aria-hidden /> {taskTitle}
             </span>
           )}
         </span>
       </button>
+      {date && (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={done}
+          aria-label={`Mark "${r.title}" ${done ? 'not done' : 'done'}`}
+          onClick={toggle}
+          className="grid h-11 w-8 shrink-0 place-items-center"
+        >
+          <span
+            className={cn(
+              'grid h-[19px] w-[19px] place-items-center rounded-full border-[1.5px] transition-colors',
+              done ? 'border-success bg-success text-on-tile' : state === 'dismissed' ? 'border-line' : 'border-faint hover:border-accent',
+            )}
+          >
+            {done && <Check size={12} strokeWidth={3.4} />}
+          </span>
+        </button>
+      )}
       <ActionMenu items={items} label={`Actions for ${r.title}`} />
     </div>
   )
@@ -191,16 +192,8 @@ export default function RemindersPage() {
 
   return (
     <Page>
-      <PageHeader
-        title="Reminders"
-        back="/more"
-        actions={
-          <Button size="sm" variant="primary" icon={Plus} onClick={add}>
-            New
-          </Button>
-        }
-      />
-      <div className="flex flex-col gap-6">
+      <PageHeader title="Reminders" subtitle={groups ? `${groups.todayList.length} today · ${groups.repeating.length} repeating` : undefined} back="/more" actions={<NavSquare icon={Plus} label="New reminder" onClick={add} />} />
+      <div className="flex flex-col gap-3">
         <NotificationStatusPanel />
 
         {!groups ? (
@@ -218,7 +211,15 @@ export default function RemindersPage() {
           />
         ) : (
           <>
-            <Section title="Today" count={groups.todayList.length}>
+            <Section
+              title="Today"
+              count={groups.todayList.length}
+              action={
+                <button type="button" onClick={add} className="inline-flex items-center gap-0.5 rounded-lg px-1.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent-soft">
+                  <Plus size={14} strokeWidth={2.6} aria-hidden /> Add
+                </button>
+              }
+            >
               {groups.todayList.length ? (
                 groups.todayList.map((r) => <ReminderRow key={r.id} r={r} date={t} taskTitle={r.taskId ? taskTitles?.[r.taskId] : undefined} />)
               ) : (
@@ -234,6 +235,7 @@ export default function RemindersPage() {
                       key={`${r.id}:${date}`}
                       r={r}
                       date={date}
+                      when={formatDate(date, 'EEE d')}
                       meta={<span className="font-medium text-text">{relativeDayLabel(date, settings.dateFormat)}</span>}
                       taskTitle={r.taskId ? taskTitles?.[r.taskId] : undefined}
                     />
@@ -263,6 +265,7 @@ export default function RemindersPage() {
                     key={r.id}
                     r={r}
                     date={r.date}
+                    when={formatDate(r.date, 'd MMM')}
                     meta={<span>{relativeDayLabel(r.date, settings.dateFormat)}</span>}
                     taskTitle={r.taskId ? taskTitles?.[r.taskId] : undefined}
                   />

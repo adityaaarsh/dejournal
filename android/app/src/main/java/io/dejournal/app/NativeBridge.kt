@@ -106,6 +106,17 @@ class NativeBridge(private val activity: MainActivity, private val webView: WebV
         }
     }
 
+    /** Per-day total plus minutes per app category (for the Today pie chart). */
+    @JavascriptInterface
+    fun getScreenTimeDetail(startDate: String, endDate: String): String {
+        if (!DATE.matches(startDate) || !DATE.matches(endDate)) return "{}"
+        return try {
+            ScreenTime.detailPerDay(ctx, startDate, endDate)
+        } catch (e: Exception) {
+            "{}"
+        }
+    }
+
     /* -------- Files, system UI, links -------- */
 
     @JavascriptInterface

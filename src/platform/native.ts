@@ -22,6 +22,8 @@ interface NativeBridge {
   usageAccessGranted(): boolean
   openUsageAccessSettings(): void
   getScreenTime(startDate: string, endDate: string): string
+  /** Newer app versions: per-day total + minutes per app category. */
+  getScreenTimeDetail?(startDate: string, endDate: string): string
   saveFile(fileName: string, mime: string, base64: string): void
   setSystemBars(theme: string): void
   openExternal(url: string): void
@@ -171,6 +173,28 @@ export function readNativeScreenTime(startDate: string, endDate: string): Record
   } catch {
     return {}
   }
+}
+
+export interface ScreenTimeDay {
+  total: number
+  breakdown: Record<string, number> | null
+}
+
+/**
+ * Screen time per local date with a category breakdown when the app supports
+ * it; falls back to totals only on older app versions.
+ */
+export function readNativeScreenTimeDetail(startDate: string, endDate: string): Record<string, ScreenTimeDay> {
+  const b = bridge()
+  if (!b) return {}
+  if (b.getScreenTimeDetail) {
+    try {
+      return JSON.parse(b.getScreenTimeDetail(startDate, endDate)) as Record<string, ScreenTimeDay>
+    } catch {
+      /* fall back to totals */
+    }
+  }
+  return Object.fromEntries(Object.entries(readNativeScreenTime(startDate, endDate)).map(([d, m]) => [d, { total: m, breakdown: null }]))
 }
 
 /* ---------------- Files, system UI, links ---------------- */

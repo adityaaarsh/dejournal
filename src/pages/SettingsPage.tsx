@@ -1,7 +1,40 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowDown, ArrowUp, Bot, Download, HardDrive, Info, RotateCcw, ShieldCheck, Trash2, Upload, Check } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  Bell,
+  BellRing,
+  Bot,
+  CalendarDays,
+  CalendarRange,
+  Check,
+  ChevronRight,
+  Download,
+  Eye,
+  Globe,
+  HardDrive,
+  History,
+  Info,
+  LayoutGrid,
+  Lightbulb,
+  Map as MapIcon,
+  MapPin,
+  MoonStar,
+  Palette,
+  RotateCcw,
+  ShieldCheck,
+  Smile,
+  SunMoon,
+  Target,
+  Trash2,
+  Upload,
+  Wallet,
+  Wind,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react'
 import { db } from '@/db/db'
 import { kvSet } from '@/db/repo'
 import {
@@ -14,7 +47,7 @@ import {
   type Settings,
 } from '@/stores/settings'
 import { confirmDialog, toast } from '@/stores/ui'
-import { Button, Card, Chip, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, Select, Sheet, Toggle } from '@/components/ui'
+import { Button, Chip, Field, IconButton, IconTile, Input, Notice, Page, PageHeader, SectionLabel, Segmented, Select, Sheet, Toggle, type Tone } from '@/components/ui'
 import { QUICK_ACTIONS } from '@/features/quick/QuickActionSheet'
 import { CURRENCIES, currencySymbol } from '@/lib/money'
 import { formatDate, today } from '@/lib/dates'
@@ -28,23 +61,24 @@ import { usePermission } from '@/features/reminders/NotificationStatus'
 
 const SECTION_LABELS: Record<DashboardSectionId, string> = {
   recommendation: 'Suggestion',
-  rating: 'Rating & selfie',
+  rating: 'Mood',
   highlight: 'Highlight',
   tasks: 'To-do',
   agenda: 'Agenda',
   routines: 'Routines',
   study: 'Study',
-  expenses: 'Expenses',
+  expenses: 'Spending',
+  screentime: 'Screen time',
   activity: 'Recent activity',
 }
 
 const DATE_FORMATS = ['EEE, d MMM', 'EEEE, d MMMM', 'd MMM yyyy', 'EEE, MMM d', 'dd/MM/yyyy', 'MM/dd/yyyy']
 
 const ACCENTS: Array<{ value: Accent; label: string; color: string }> = [
-  { value: 'blue', label: 'Blue', color: '#5b9bff' },
-  { value: 'violet', label: 'Violet', color: '#9b8cff' },
-  { value: 'teal', label: 'Teal', color: '#3cc4b4' },
-  { value: 'rose', label: 'Rose', color: '#f27a9b' },
+  { value: 'blue', label: 'Mist blue', color: '#a9c3ee' },
+  { value: 'violet', label: 'Lavender', color: '#b9b2ee' },
+  { value: 'teal', label: 'Sage', color: '#9dc7b2' },
+  { value: 'rose', label: 'Rose', color: '#e7aaa4' },
 ]
 
 const JUMP: Array<{ id: string; label: string }> = [
@@ -59,18 +93,36 @@ const JUMP: Array<{ id: string; label: string }> = [
 
 function Section({ id, title, description, children }: { id: string; title: string; description?: ReactNode; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-28">
-      <h2 id={`${id}-h`} className="mb-1 px-1 text-xs font-semibold tracking-wider text-faint uppercase">
-        {title}
-      </h2>
-      {description && <p className="mb-2 px-1 text-[13px] text-muted">{description}</p>}
-      <Card className="divide-y divide-line px-4">{children}</Card>
+    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-32">
+      <SectionLabel className="mt-0">
+        <span id={`${id}-h`}>{title}</span>
+      </SectionLabel>
+      {description && <p className="-mt-0.5 mb-2 px-1 text-xs leading-relaxed text-muted">{description}</p>}
+      <div className="divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface px-3">{children}</div>
     </section>
   )
 }
 
-function Row({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('py-3', className)}>{children}</div>
+/** One settings row: optional small icon tile on the left, content on the right. */
+function Row({ children, className, icon, tone = 'muted' }: { children: ReactNode; className?: string; icon?: LucideIcon; tone?: Tone }) {
+  if (!icon) return <div className={cn('py-3', className)}>{children}</div>
+  return (
+    <div className="flex items-start gap-3 py-3">
+      <IconTile icon={icon} tone={tone} size="sm" className="mt-0.5" />
+      <div className={cn('min-w-0 flex-1', className)}>{children}</div>
+    </div>
+  )
+}
+
+/** Row that links somewhere: icon + label + chevron. */
+function LinkRow({ to, icon, tone = 'muted', children }: { to: string; icon: LucideIcon; tone?: Tone; children: ReactNode }) {
+  return (
+    <Link to={to} className="flex min-h-[52px] items-center gap-3 py-2 text-[14px] font-semibold hover:text-accent">
+      <IconTile icon={icon} tone={tone} size="sm" />
+      <span className="flex-1">{children}</span>
+      <ChevronRight size={16} className="text-faint" aria-hidden />
+    </Link>
+  )
 }
 
 /** Text/number input that commits on blur or Enter (avoids writing on every keystroke). */
@@ -156,8 +208,8 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
 function AppearanceSection({ s }: { s: Settings }) {
   return (
     <Section id="appearance" title="Appearance">
-      <Row className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-[15px]">Theme</span>
+      <Row icon={SunMoon} tone="accent" className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-[14px] font-semibold">Theme</span>
         <Segmented
           label="Theme"
           size="sm"
@@ -170,8 +222,8 @@ function AppearanceSection({ s }: { s: Settings }) {
           ]}
         />
       </Row>
-      <Row className="flex flex-wrap items-center justify-between gap-3">
-        <span id="accent-label" className="text-[15px]">
+      <Row icon={Palette} tone="accent" className="flex flex-wrap items-center justify-between gap-3">
+        <span id="accent-label" className="text-[14px] font-semibold">
           Accent colour
         </span>
         <div role="radiogroup" aria-labelledby="accent-label" className="flex gap-2">
@@ -185,20 +237,20 @@ function AppearanceSection({ s }: { s: Settings }) {
               title={a.label}
               onClick={() => updateSettings({ accent: a.value })}
               className={cn(
-                'grid h-10 w-10 place-items-center rounded-full border-2 transition-transform',
+                'grid h-9 w-9 place-items-center rounded-full border-2 transition-transform',
                 s.accent === a.value ? 'border-text' : 'border-transparent hover:scale-105',
               )}
             >
-              <span className="grid h-7 w-7 place-items-center rounded-full" style={{ background: a.color }}>
+              <span className="grid h-6 w-6 place-items-center rounded-full" style={{ background: a.color }}>
                 {s.accent === a.value && <Check size={15} className="text-black/80" aria-hidden />}
               </span>
             </button>
           ))}
         </div>
       </Row>
-      <Row className="flex flex-wrap items-center justify-between gap-3">
+      <Row icon={Wind} tone="accent" className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <span className="text-[15px]">Motion</span>
+          <span className="text-[14px] font-semibold">Motion</span>
           <p className="text-xs text-faint">"System" follows your device's reduced-motion setting.</p>
         </div>
         <Segmented
@@ -221,7 +273,7 @@ function GeneralSection({ s }: { s: Settings }) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
   return (
     <Section id="general" title="General">
-      <Row>
+      <Row icon={CalendarDays} tone={1}>
         <Field label="Date format" hint={`Preview: ${formatDate(today(), s.dateFormat)}`}>
           {(p) => (
             <Select {...p} value={s.dateFormat} onChange={(e) => updateSettings({ dateFormat: e.target.value })}>
@@ -234,8 +286,8 @@ function GeneralSection({ s }: { s: Settings }) {
           )}
         </Field>
       </Row>
-      <Row className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-[15px]">First day of the week</span>
+      <Row icon={CalendarRange} tone={1} className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-[14px] font-semibold">First day of the week</span>
         <Segmented
           label="First day of the week"
           size="sm"
@@ -247,14 +299,14 @@ function GeneralSection({ s }: { s: Settings }) {
           ]}
         />
       </Row>
-      <Row>
-        <p className="text-[15px]">Time zone</p>
-        <p className="mt-0.5 text-[13px] text-muted">
+      <Row icon={Globe} tone={1}>
+        <p className="text-[14px] font-semibold">Time zone</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted">
           {tz}. Entries are saved under your local calendar date, so travelling or changing time zones never moves them to a different day. Times are
           shown in your device's current time zone.
         </p>
       </Row>
-      <Row>
+      <Row icon={Wallet} tone={2}>
         <Field label="Default currency" hint="Used for new expenses and totals. Existing expenses keep their own currency.">
           {(p) => (
             <Select {...p} value={s.currency} onChange={(e) => updateSettings({ currency: e.target.value })}>
@@ -267,13 +319,13 @@ function GeneralSection({ s }: { s: Settings }) {
           )}
         </Field>
       </Row>
-      <Row className="grid gap-4 sm:grid-cols-3">
+      <Row icon={Target} tone={3} className="grid gap-4 sm:grid-cols-3">
         <MinutesField label="Daily study goal (min)" value={s.studyGoalDailyMin} onCommit={(n) => updateSettings({ studyGoalDailyMin: n })} />
         <MinutesField label="Weekly study goal (min)" value={s.studyGoalWeeklyMin} max={10080} onCommit={(n) => updateSettings({ studyGoalWeeklyMin: n })} />
         <MinutesField label="Screen-time goal (min)" value={s.screenTimeGoalMin} onCommit={(n) => updateSettings({ screenTimeGoalMin: n })} hint={s.screenTimeGoalMin ? `Under ${formatDuration(s.screenTimeGoalMin * 60)} a day` : 'No goal'} />
       </Row>
-      <Row>
-        <p className="mb-2 text-[13px] font-medium text-muted">Rating labels</p>
+      <Row icon={Smile} tone="accent">
+        <p className="mb-2 text-[14px] font-semibold">Rating labels</p>
         <div className="flex flex-col gap-2">
           {s.ratingLabels.map((label, i) => (
             <div key={i} className="flex items-center gap-3">
@@ -297,7 +349,7 @@ function GeneralSection({ s }: { s: Settings }) {
           ))}
         </div>
       </Row>
-      <Row>
+      <Row icon={Eye} tone={1}>
         <Toggle label="Hide completed tasks" description="Completed tasks are tucked away on Today and in task lists." checked={s.hideCompletedTasks} onChange={(v) => updateSettings({ hideCompletedTasks: v })} />
       </Row>
     </Section>
@@ -323,12 +375,12 @@ function NotificationsSection({ s }: { s: Settings }) {
           : "Reminders can show a notification while DeJournal is open (including in a background tab). Browsers can't reliably deliver them when the app is fully closed."
       }
     >
-      <Row>
+      <Row icon={Bell} tone={4}>
         <Toggle label="Reminder notifications" description="Turn off to silence all reminder notifications." checked={s.notificationsEnabled} onChange={(v) => updateSettings({ notificationsEnabled: v })} />
       </Row>
-      <Row className="flex flex-wrap items-center justify-between gap-3">
+      <Row icon={BellRing} tone={4} className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[15px]">{native ? 'Permission' : 'Browser permission'}</p>
+          <p className="text-[14px] font-semibold">{native ? 'Permission' : 'Browser permission'}</p>
           <p className="text-xs text-faint">{permText[perm]}</p>
         </div>
         {(perm === 'default' || (native && perm === 'denied')) && (
@@ -337,7 +389,7 @@ function NotificationsSection({ s }: { s: Settings }) {
           </Button>
         )}
       </Row>
-      <Row>
+      <Row icon={MoonStar} tone={4}>
         <Toggle
           label="Quiet hours"
           description="No notifications during these hours. Reminders still appear in the app."
@@ -351,11 +403,9 @@ function NotificationsSection({ s }: { s: Settings }) {
           </div>
         )}
       </Row>
-      <Row>
-        <Link to="/reminders" className="text-[13px] font-medium text-accent hover:underline">
-          Manage reminders
-        </Link>
-      </Row>
+      <LinkRow to="/reminders" icon={Bell} tone={4}>
+        Manage reminders
+      </LinkRow>
     </Section>
   )
 }
@@ -367,7 +417,7 @@ function PrivacySection({ s }: { s: Settings }) {
       title="Privacy"
       description="Everything you record stays in this browser on this device. Nothing is uploaded unless you turn on a feature below."
     >
-      <Row>
+      <Row icon={MapPin} tone={3}>
         <Toggle
           label="Location features"
           description="Allow using your device's location when you add a place. Off by default — you can always type a place by hand. Location is never collected in the background."
@@ -375,7 +425,7 @@ function PrivacySection({ s }: { s: Settings }) {
           onChange={(v) => updateSettings({ locationEnabled: v })}
         />
       </Row>
-      <Row>
+      <Row icon={MapIcon} tone={3}>
         <Toggle
           label="Map tiles"
           description="Show maps on the Places screen. Map images are loaded from OpenStreetMap, which sees the map area being viewed (not your entries)."
@@ -383,7 +433,7 @@ function PrivacySection({ s }: { s: Settings }) {
           onChange={(v) => updateSettings({ mapTilesEnabled: v })}
         />
       </Row>
-      <Row>
+      <Row icon={History} tone={3}>
         <Toggle
           label="Remember recent searches"
           description="Keeps your last 8 searches on this device."
@@ -404,7 +454,7 @@ function PrivacySection({ s }: { s: Settings }) {
           Clear recent searches
         </button>
       </Row>
-      <Row>
+      <Row icon={Lightbulb} tone={3}>
         <Toggle
           label="Daily suggestions"
           description="A small suggestion on Today based on your own recent ratings, tasks, study and routines. Worked out on your device."
@@ -412,14 +462,12 @@ function PrivacySection({ s }: { s: Settings }) {
           onChange={(v) => updateSettings({ recommendationsEnabled: v })}
         />
       </Row>
-      <Row className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
-        <Link to="/places" className="text-accent hover:underline">
-          Manage location history
-        </Link>
-        <Link to="/photos" className="text-accent hover:underline">
-          Manage photos
-        </Link>
-      </Row>
+      <LinkRow to="/places" icon={MapPin} tone={3}>
+        Manage location history
+      </LinkRow>
+      <LinkRow to="/photos" icon={HardDrive} tone={4}>
+        Manage photos
+      </LinkRow>
     </Section>
   )
 }
@@ -445,7 +493,7 @@ function AISection({ s }: { s: Settings }) {
           </Notice>
         </Row>
       )}
-      <Row>
+      <Row icon={Bot} tone="muted">
         <Toggle
           label="Enable AI features"
           disabled={isNativeApp()}
@@ -465,7 +513,7 @@ function AISection({ s }: { s: Settings }) {
                 className="mt-1 h-5 w-5 shrink-0 accent-[var(--c-accent)]"
               />
               <label htmlFor="ai-consent" className="text-[13px] leading-relaxed text-muted">
-                <span className="block text-[15px] text-text">I agree to send summaries to the AI service</span>
+                <span className="block text-[14px] font-semibold text-text">I agree to send summaries to the AI service</span>
                 When you request an AI feature, DeJournal sends a small summary of the selected period — counts, ratings, task and highlight titles, and
                 study and spending totals — to the AI server set up for this app, which forwards it to Anthropic's Claude API. Photos, locations, note
                 text, reflections and expense notes are never sent. Nothing is sent automatically.
@@ -476,7 +524,7 @@ function AISection({ s }: { s: Settings }) {
             <div className="flex min-w-0 items-start gap-2">
               <Bot size={18} className="mt-0.5 shrink-0 text-muted" aria-hidden />
               <div>
-                <p className="text-[15px]">AI server</p>
+                <p className="text-[14px] font-semibold">AI server</p>
                 <p className={cn('text-xs', status?.available ? 'text-success' : 'text-faint')}>{status ? status.detail : 'Checking…'}</p>
               </div>
             </div>
@@ -505,8 +553,8 @@ function DashboardSection({ s }: { s: Settings }) {
   const hidden = allActions.filter((a) => !s.quickActions.includes(a))
   return (
     <Section id="dashboard" title="Dashboard" description="Choose what appears on Today and in the quick-add menu.">
-      <Row>
-        <p className="mb-1 text-[13px] font-medium text-muted">Today sections</p>
+      <Row icon={LayoutGrid} tone={5}>
+        <p className="mb-1 text-[14px] font-semibold">Today sections</p>
         <ul>
           {s.dashboard.map((sec, i) => (
             <li key={sec.id} className="flex items-center gap-1">
@@ -529,8 +577,8 @@ function DashboardSection({ s }: { s: Settings }) {
           ))}
         </ul>
       </Row>
-      <Row>
-        <p className="mb-1 text-[13px] font-medium text-muted">Quick actions</p>
+      <Row icon={Zap} tone={5}>
+        <p className="mb-1 text-[14px] font-semibold">Quick actions</p>
         <ul>
           {s.quickActions.map((id, i) => {
             const { label, icon: Icon } = QUICK_ACTIONS[id]
@@ -750,10 +798,9 @@ function DataSection() {
 
   return (
     <Section id="data" title="Your data" description="DeJournal is local-first: your data lives in this browser's storage. Export regularly to keep a copy.">
-      <Row className="flex items-start gap-3">
-        <HardDrive size={18} className="mt-0.5 shrink-0 text-muted" aria-hidden />
+      <Row icon={HardDrive} tone={2}>
         <div className="min-w-0 flex-1">
-          <p className="text-[15px]">Storage</p>
+          <p className="text-[14px] font-semibold">Storage</p>
           <p className="text-xs text-faint">
             {estimate?.usage !== undefined
               ? `${formatBytes(estimate.usage)} used${estimate.quota ? ` of ${formatBytes(estimate.quota)} available` : ''}`
@@ -770,11 +817,10 @@ function DataSection() {
         </div>
       </Row>
       {persisted !== null && (
-        <Row className="flex flex-wrap items-center justify-between gap-3">
+        <Row icon={ShieldCheck} tone={persisted ? 'success' : 'muted'} className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-start gap-3">
-            <ShieldCheck size={18} className={cn('mt-0.5 shrink-0', persisted ? 'text-success' : 'text-muted')} aria-hidden />
             <div>
-              <p className="text-[15px]">Persistent storage</p>
+              <p className="text-[14px] font-semibold">Persistent storage</p>
               <p className="text-xs text-faint">{persisted ? 'On — the browser will not clear DeJournal data to free up space.' : 'Off — the browser may clear data when the device runs low on space.'}</p>
             </div>
           </div>
@@ -793,8 +839,8 @@ function DataSection() {
           )}
         </Row>
       )}
-      <Row>
-        <p className="text-[15px]">Export backup</p>
+      <Row icon={Download} tone={2}>
+        <p className="text-[14px] font-semibold">Export backup</p>
         <p className="mb-2 text-xs text-faint">Downloads a JSON file with all your records{includePhotos ? ' and photos' : ''}.</p>
         <Toggle label="Include photos" description="Turn off for a much smaller file." checked={includePhotos} onChange={setIncludePhotos} />
         <Button
@@ -816,8 +862,8 @@ function DataSection() {
           Export backup
         </Button>
       </Row>
-      <Row>
-        <p className="text-[15px]">Import backup</p>
+      <Row icon={Upload} tone={2}>
+        <p className="text-[14px] font-semibold">Import backup</p>
         <p className="mb-2 text-xs text-faint">Restore from a DeJournal backup file. You'll choose to merge or replace before anything changes.</p>
         <input
           ref={fileRef}
@@ -835,8 +881,8 @@ function DataSection() {
           Choose file
         </Button>
       </Row>
-      <Row>
-        <p className="text-[15px]">Delete all data</p>
+      <Row icon={Trash2} tone="danger">
+        <p className="text-[14px] font-semibold">Delete all data</p>
         <p className="mb-2 text-xs text-faint">Permanently erase everything stored by DeJournal in this browser.</p>
         <Button variant="danger" icon={Trash2} onClick={() => setDeleting(true)}>
           Delete all data…
@@ -868,12 +914,12 @@ export default function SettingsPage() {
               document.getElementById(j.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
               history.replaceState(null, '', `#${j.id}`)
             }}>
-              <Chip>{j.label}</Chip>
+              <Chip className="h-8 px-3">{j.label}</Chip>
             </a>
           ))}
         </nav>
       </PageHeader>
-      <div className="flex flex-col gap-7">
+      <div className="flex flex-col gap-5">
         <AppearanceSection s={s} />
         <GeneralSection s={s} />
         <NotificationsSection s={s} />
@@ -882,16 +928,19 @@ export default function SettingsPage() {
         <DashboardSection s={s} />
         <DataSection />
         <section aria-labelledby="about-h">
-          <h2 id="about-h" className="mb-1 px-1 text-xs font-semibold tracking-wider text-faint uppercase">
-            About
-          </h2>
-          <Card className="p-4 text-[13px] leading-relaxed text-muted">
-            <p className="text-[15px] font-medium text-text">DeJournal {APP_VERSION}</p>
-            <p className="mt-1">
-              A private journal, planner and life tracker. Your records are stored only in this browser (IndexedDB) and are never uploaded. Optional
-              features — AI summaries, calendar import and maps — only contact outside services when you turn them on.
-            </p>
-          </Card>
+          <SectionLabel className="mt-0">
+            <span id="about-h">About</span>
+          </SectionLabel>
+          <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 text-xs leading-relaxed text-muted">
+            <IconTile icon={Info} tone="accent" size="sm" className="mt-0.5" />
+            <div>
+              <p className="text-[14px] font-semibold text-text">DeJournal {APP_VERSION}</p>
+              <p className="mt-0.5">
+                A private journal, planner and life tracker. Your records are stored only in this browser (IndexedDB) and are never uploaded. Optional
+                features — AI summaries, calendar import and maps — only contact outside services when you turn them on.
+              </p>
+            </div>
+          </div>
         </section>
       </div>
     </Page>

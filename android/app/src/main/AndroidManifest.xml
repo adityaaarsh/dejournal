@@ -21,11 +21,19 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
 
-    <!-- Needed to recognise the home-screen app so it isn't counted as screen time. -->
+    <!--
+      Screen time: recognise the home-screen app (not counted) and read the Play
+      category of launchable apps for the pie chart. Launcher-intent visibility
+      doesn't need the restricted QUERY_ALL_PACKAGES permission.
+    -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
 
